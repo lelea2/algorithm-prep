@@ -1,0 +1,1760 @@
+---
+title: "AI-Assisted Feature Flag Interview Playbook"
+description: "60-minute interview strategy for leading a feature flag evaluation implementation with Claude, including prompts, milestones, validation, debugging, tests, and Python reference code."
+---
+
+# AI-Assisted Feature Flag Interview Playbook
+
+## Goal
+
+Use Claude as a bounded implementation and reasoning assistant while **you remain the driver** of the interview.
+
+The strongest signal is not:
+
+> "Claude solved the problem."
+
+The stronger signal is:
+
+> "I decomposed the problem, identified ambiguous semantics, used Claude to investigate one uncertainty at a time, validated each milestone, and owned every implementation decision."
+
+---
+
+# Problem Background
+
+You are given three JSON files and asked to implement a feature flag evaluation engine that maps each user to the final boolean value of every flag.
+
+## Input Files
+
+### `flags.json`
+
+Contains definitions for 7 feature flags.
+
+Example:
+
+```json
+{
+  "key": "beta_dashboard",
+  "enabled": true,
+  "default": false,
+  "rules": [
+    {
+      "name": "market_launch",
+      "conditions": [
+        {
+          "attribute": "country",
+          "operator": "in",
+          "value": ["US", "CA"]
+        },
+        {
+          "attribute": "plan",
+          "operator": "eq",
+          "value": "enterprise"
+        }
+      ],
+      "value": true
+    }
+  ]
+}
+```
+
+### `user.json`
+
+Contains approximately 10,000 users.
+
+Typical fields:
+
+```json
+{
+  "user_id": "12345",
+  "email": "user@example.com",
+  "country": "US",
+  "plan": "enterprise",
+  "support_tier": "premium"
+}
+```
+
+### `expected_decisions.json`
+
+Contains ground-truth decisions for approximately:
+
+```text
+200 users × 7 flags = 1,400 decisions
+```
+
+Use this file as an **oracle** to infer ambiguous semantics and validate implementation correctness.
+
+---
+
+# Confirmed Semantics
+
+## Disabled Flag
+
+If:
+
+```json
+{
+  "enabled": false
+}
+```
+
+return the flag's default immediately.
+
+Do not evaluate rules.
+
+---
+
+## Rule Conditions
+
+Conditions inside one rule use logical AND.
+
+```text
+condition A
+AND
+condition B
+AND
+condition C
+```
+
+All must match.
+
+---
+
+## No Matching Rules
+
+Return:
+
+```python
+flag["default"]
+```
+
+---
+
+## Multiple Matching Rules
+
+If multiple rules match:
+
+```text
+false
+false
+true
+false
+```
+
+the final result is:
+
+```text
+true
+```
+
+This is **true-wins aggregation**.
+
+Do not assume:
+
+- first matching rule wins
+- last matching rule wins
+- alphabetical rule order
+- rule-name priority
+
+---
+
+# Operators
+
+Known operators include:
+
+```text
+eq
+in
+regex
+~=
+```
+
+Important:
+
+- `regex` is anchored like `re.match`
+- `~=` semantics must be verified from fixture data
+- unknown operators should fail safely
+- missing attributes should not crash evaluation
+
+---
+
+# Percentage Rollout
+
+Some rules include:
+
+```json
+{
+  "percentage": 30
+}
+```
+
+Do not blindly assume how the percentage bucket is calculated.
+
+Possible interpretations include:
+
+```text
+user_id % 100
+hash(user_id) % 100
+hash(flag_key + user_id) % 100
+input ordering
+another deterministic strategy
+```
+
+Use `expected_decisions.json` to infer the correct behavior before locking in the implementation.
+
+---
+
+# Dirty Data Trap
+
+Some users may contain:
+
+```json
+{
+  "country": "",
+  "plan": ""
+}
+```
+
+These may have appeared after the expected decisions were generated.
+
+Do not immediately assume every mismatch involving empty data is an evaluator bug.
+
+Distinguish:
+
+```text
+A. evaluator bug
+B. dirty fixture data
+C. expected data generated from an earlier clean dataset
+```
+
+---
+
+# 60-Minute Interview Plan
+
+| Time | Milestone |
+|---|---|
+| 00–05 | Understand requirements and define milestones |
+| 05–10 | Inspect fixtures and resolve semantics |
+| 10–18 | Implement `evaluate_condition` |
+| 18–24 | Implement `rule_matches` |
+| 24–32 | Implement `evaluate_flag` |
+| 32–38 | Implement orchestration + oracle harness |
+| 38–45 | Diagnose mismatches |
+| 45–50 | Add regression tests |
+| 50–55 | Cleanup + code review |
+| 55–60 | Explain architecture, complexity, and tradeoffs |
+
+---
+
+# Step 1 — 0–5 Minutes
+
+## Restate the Problem
+
+Say:
+
+> "I'm going to separate this into condition evaluation, rule evaluation, flag aggregation, percentage rollout, and oracle validation. I'll use Claude incrementally to challenge assumptions and help with small implementation steps rather than asking it to generate the whole solution."
+
+## Claude Prompt
+
+```text
+I'm implementing a feature-flag evaluator from three JSON files:
+
+- flags.json
+- user.json
+- expected_decisions.json
+
+Known requirements:
+
+- disabled flag => return default immediately
+- conditions within a rule use AND
+- no matching rules => default
+- multiple matching rules => true wins
+- operators: eq, in, regex, ~=
+- some rules contain percentage rollout
+- expected_decisions.json contains oracle results
+
+Do NOT implement yet.
+
+Give me:
+
+1. a compact list of confirmed semantics
+2. ambiguous semantics I must verify from the fixtures
+3. a minimal implementation plan with milestones
+4. the 5 highest-risk edge cases
+
+Keep this concise because this is a 60-minute coding interview.
+```
+
+## Milestones
+
+```text
+M1 inspect data
+M2 condition evaluator
+M3 rule evaluator
+M4 flag evaluator
+M5 oracle validation
+M6 percentage / ~= resolution
+M7 edge cases + cleanup
+```
+
+---
+
+# Step 2 — 5–10 Minutes
+
+## Inspect the Fixtures
+
+Focus only on ambiguous semantics.
+
+### Claude Prompt
+
+```text
+Inspect these fixtures with me.
+
+I need evidence for only these questions:
+
+1. What exactly does ~= mean?
+2. How is percentage rollout determined?
+3. Can multiple rules match the same user?
+4. Confirm that true wins when matched rules conflict.
+5. What shapes do missing or empty user fields take?
+
+Do not generate implementation code.
+
+For each question, show the smallest concrete fixture examples that answer it.
+```
+
+## Percentage Investigation Prompt
+
+```text
+Percentage rollout is underspecified.
+
+Do not assume an industry-standard hash.
+
+Using expected_decisions.json, determine whether the observed results are consistent with:
+
+- user_id % 100
+- hash(user_id) % 100
+- hash(flag_key + user_id) % 100
+- input-order percentage
+- another obvious deterministic strategy
+
+Tell me what is proven versus still uncertain.
+```
+
+## Strong Interview Signal
+
+Say:
+
+> "The percentage field is underspecified, so I don't want to guess whether it uses user ID hashing, flag-scoped hashing, or ordering. I'll use the oracle first."
+
+---
+
+# Step 3 — 10–18 Minutes
+
+# Implement `evaluate_condition`
+
+Target:
+
+```python
+evaluate_condition(user, condition) -> bool
+```
+
+## Claude Prompt
+
+```text
+Current milestone: implement only
+
+evaluate_condition(user, condition) -> bool
+
+Operators:
+
+- eq
+- in
+- regex
+- ~=
+
+Known semantics from fixtures:
+[paste what we established]
+
+Requirements:
+
+- missing attributes must not throw
+- regex uses anchored matching
+- unknown operators should fail safely
+
+Do not build rules or flags yet.
+
+Give me:
+
+1. short pseudocode
+2. edge cases
+3. 6 table-driven tests
+4. then a minimal Python implementation
+```
+
+---
+
+# Step 4 — Challenge Claude Before Accepting Code
+
+Use Claude as a reviewer.
+
+```text
+Review this condition evaluator.
+
+Do NOT rewrite it yet.
+
+Find:
+
+- incorrect coercion
+- missing/null/empty-string problems
+- regex mistakes
+- incorrect ~= semantics
+- cases where an exception could escape
+
+Give me only correctness issues and tests that expose them.
+```
+
+Target checkpoint:
+
+```text
+eq     ✅
+in     ✅
+regex  ✅
+~=     ✅ or explicitly isolated
+```
+
+---
+
+# Step 5 — 18–24 Minutes
+
+# Implement `rule_matches`
+
+Target:
+
+```python
+rule_matches(user, flag, rule)
+```
+
+## Claude Prompt
+
+```text
+Next milestone: rule evaluation.
+
+I already have evaluate_condition().
+
+Required rule semantics:
+
+- all conditions must match: logical AND
+- percentage rollout should be evaluated only after conditions match
+- empty/malformed conditions should fail safely according to fixture behavior
+
+Review this decomposition:
+
+rule_matches(user, flag, rule)
+    -> conditions_match
+    -> percentage_check
+
+Give me:
+
+1. semantic problems with this split
+2. 4 focused tests
+3. minimal Python code only for this layer
+
+Do not implement evaluate_flag yet.
+```
+
+## Empty Conditions Trap
+
+Python:
+
+```python
+all([])
+```
+
+returns:
+
+```python
+True
+```
+
+So explicitly investigate the meaning of an empty conditions array.
+
+### Prompt
+
+```text
+For an empty conditions array, Python all([]) returns True.
+
+Based on feature-flag semantics and the fixtures, should an empty-condition rule represent an unconditional rule or an invalid rule?
+
+Use fixture evidence if available. Do not guess.
+```
+
+---
+
+# Step 6 — 24–32 Minutes
+
+# Implement `evaluate_flag`
+
+Target:
+
+```python
+evaluate_flag(user, flag) -> bool
+```
+
+## Expected Flow
+
+```text
+flag disabled?
+    |
+   yes
+    |
+return default
+
+    no
+    |
+evaluate matching rules
+    |
+any TRUE matching rule?
+    |
+   yes ---> return True
+    |
+    no
+    |
+did any rule match?
+   / \
+ yes  no
+ |     |
+False default
+```
+
+## Claude Prompt
+
+```text
+Next milestone: evaluate a single flag.
+
+Confirmed semantics:
+
+1. if enabled == false -> return default immediately
+2. evaluate matching rules
+3. if none match -> return default
+4. if multiple match -> true wins
+5. percentage eligibility is part of rule matching
+
+I want:
+
+evaluate_flag(user, flag) -> bool
+
+Before code:
+
+- state the control-flow invariant
+- identify whether true-wins lets us short-circuit
+- give 5 tests
+
+Then give the smallest readable Python implementation with comments explaining WHY, not obvious syntax.
+```
+
+---
+
+# Step 7 — Try to Break `evaluate_flag`
+
+Prompt:
+
+```text
+Try to break evaluate_flag.
+
+Focus on:
+
+- default=true with matching false rule
+- default=false with no match
+- one false + one true rule
+- disabled flag with otherwise matching true rule
+- rules with percentage exclusions
+
+Do not refactor unless you find a correctness issue.
+```
+
+---
+
+# Step 8 — 32–38 Minutes
+
+# Implement Orchestration
+
+Target:
+
+```python
+evaluate_all_flags(user, flags)
+evaluate_all_users(users, flags)
+```
+
+These functions should contain no feature-flag semantics.
+
+## Claude Prompt
+
+```text
+Core flag evaluation is implemented.
+
+Now add only orchestration:
+
+evaluate_all_flags(user, flags)
+evaluate_all_users(users, flags)
+
+No feature semantics should leak into these functions.
+
+Then create a validation harness against expected_decisions.json that reports:
+
+- passed / total
+- accuracy
+- mismatch records containing user_id, flag, expected, actual
+
+Keep it simple and interview-friendly.
+```
+
+---
+
+# Step 9 — Oracle Validation
+
+Run all expected decisions.
+
+Target:
+
+```text
+1,400 comparisons
+```
+
+Possible result:
+
+```text
+Passed: 1378 / 1400
+```
+
+Do not polish yet.
+
+Analyze failures first.
+
+---
+
+# Step 10 — 38–45 Minutes
+
+# Cluster Failures Instead of Patching
+
+Bad prompt:
+
+```text
+Fix my failures.
+```
+
+Better prompt:
+
+```text
+Oracle result:
+
+passed: 1378 / 1400
+
+Here are the mismatches:
+[paste mismatches]
+
+Do NOT modify code yet.
+
+Cluster failures by likely root cause.
+
+Return a table:
+
+cluster | count | shared characteristics | likely violated invariant | smallest diagnostic experiment
+
+Prefer one semantic explanation that accounts for many failures over individual patches.
+```
+
+---
+
+# Scenario — Rollout Failures
+
+```text
+Focus only on the rollout failure cluster.
+
+Current implementation:
+[paste rollout function]
+
+Observed mismatches:
+[paste cases]
+
+Expected:
+...
+
+Actual:
+...
+
+Give me:
+
+1. 3 hypotheses
+2. which fixture examples distinguish them
+3. the smallest experiment
+4. only then the minimal fix
+```
+
+---
+
+# Scenario — Dirty Data Failures
+
+```text
+All remaining failures involve country="" or plan="".
+
+I do not want to change core semantics unless necessary.
+
+Help me distinguish:
+
+A. evaluator bug
+B. dirty fixture data
+C. expected_decisions generated before dirty fields were introduced
+
+Give me evidence and a minimal diagnostic.
+```
+
+Strong interviewer statement:
+
+> "I don't want to contaminate clean evaluation semantics with a workaround until I know whether the mismatch belongs to the evaluator or the fixture."
+
+---
+
+# General Debugging Prompt
+
+Use this structure repeatedly:
+
+```text
+Expected:
+...
+
+Actual:
+...
+
+Relevant input:
+...
+
+Current invariant:
+...
+
+Current implementation:
+...
+
+Do not rewrite the entire solution.
+
+Please:
+
+1. identify the most likely violated invariant
+2. propose 2-3 hypotheses
+3. suggest the smallest diagnostic experiment
+4. only after that suggest the minimal code change
+```
+
+---
+
+# Scenario — Claude Generates Too Much Code
+
+Redirect it.
+
+```text
+Stop before implementation.
+
+You're solving too much at once.
+
+For this step I only need:
+
+- contract
+- invariants
+- edge cases
+- tests
+
+I will implement the code myself.
+```
+
+Or:
+
+```text
+Reduce this to the smallest change required for the current milestone.
+
+Do not refactor unrelated code.
+```
+
+---
+
+# Scenario — Claude Makes an Unsupported Assumption
+
+Example:
+
+> "Use hash(userId) % 100."
+
+Respond:
+
+```text
+That's plausible, but it is not established by the requirements.
+
+Do not treat industry convention as evidence.
+
+Show me what observations from expected_decisions.json distinguish:
+
+hash(userId)
+from
+hash(flagKey + userId)
+from
+userId % 100
+
+I want to infer behavior before implementing it.
+```
+
+---
+
+# Scenario — 10–20 Tests Still Fail
+
+Avoid:
+
+```text
+fix the failures
+```
+
+Use:
+
+```text
+Current accuracy: 1387 / 1400.
+
+I don't want 13 ad-hoc patches.
+
+Analyze the failures for a shared pattern.
+
+Create a table:
+
+failure cluster | count | likely cause | evidence | diagnostic
+
+Prefer one semantic correction that explains many failures over case-specific fixes.
+```
+
+---
+
+# Scenario — Claude Proposes a Large Refactor
+
+```text
+This change is larger than I want during an interview.
+
+Preserve:
+
+- public function signatures
+- current passing behavior
+- existing tests
+
+Suggest the smallest delta that fixes the identified invariant.
+
+Show changed lines conceptually before generating code.
+```
+
+---
+
+# Step 11 — 45–50 Minutes
+
+# Regression Tests
+
+Prompt:
+
+```text
+Core evaluator now matches the oracle on clean data.
+
+Generate a compact pytest regression suite covering only high-value semantics:
+
+1. disabled flag returns default
+2. conditions use AND
+3. no match returns default
+4. true-wins conflicts
+5. regex is anchored
+6. ~= behavior
+7. rollout 0 / boundary / 100
+8. missing/empty user attributes
+9. default=true + matched false rule
+
+Keep tests small and readable.
+```
+
+If time is short, simple asserts are enough.
+
+```python
+assert evaluate_flag(user, flag) is True
+```
+
+Say:
+
+> "Given the interview timebox, I'll keep tests lightweight but still cover semantic boundaries."
+
+---
+
+# Step 12 — 50–55 Minutes
+
+# Cleanup and Code Review
+
+Prompt:
+
+```text
+The implementation passes the oracle and targeted tests.
+
+Do a final interview-oriented code review.
+
+Priorities, in order:
+
+1. correctness
+2. readability
+3. unnecessary duplication
+4. obvious performance issues
+5. comments explaining non-obvious semantics
+
+Do NOT introduce new abstractions unless they materially simplify the code.
+Do NOT change public function signatures.
+Do NOT rewrite working logic unnecessarily.
+
+Give me a short list of changes ranked:
+
+must-fix
+optional
+```
+
+## Overengineering Check
+
+```text
+Check specifically for accidental overengineering.
+
+There are only 7 flags and 10,000 users.
+
+Tell me what abstractions I should NOT add.
+```
+
+Avoid unnecessary:
+
+```text
+classes
+factories
+dependency injection
+visitor patterns
+complex rule engines
+```
+
+A simple functional design is enough.
+
+---
+
+# Step 13 — 55–60 Minutes
+
+# Explain the Solution
+
+Use this structure.
+
+## Architecture
+
+> "The evaluator is decomposed into condition, rule, flag, and orchestration layers so each semantic unit can be tested independently."
+
+## Disabled Flags
+
+> "A disabled flag returns its default immediately and skips all rule evaluation."
+
+## Rules
+
+> "Conditions inside a rule are ANDed."
+
+## Conflict Resolution
+
+> "When multiple rules match, any true rule wins, so the evaluator can short-circuit once it finds a matching true rule."
+
+## Oracle
+
+> "I used expected_decisions.json as an oracle for underspecified behavior rather than guessing."
+
+## Percentage Rollout
+
+> "I isolated percentage bucketing because rollout semantics were ambiguous and should be inferred from the fixture."
+
+## Complexity
+
+For:
+
+```text
+U = users
+F = flags
+R = average rules per flag
+C = average conditions per rule
+```
+
+runtime is approximately:
+
+```text
+O(U × F × R × C)
+```
+
+For:
+
+```text
+10,000 users
+7 flags
+small rule sets
+```
+
+this is easily acceptable.
+
+---
+
+# Final 90-Second Claude Prompt
+
+```text
+I need to explain this solution in under 90 seconds.
+
+Summarize:
+
+- decomposition
+- semantics
+- complexity
+- why the oracle was useful
+- one scaling improvement
+
+Keep it technically precise and concise.
+```
+
+---
+
+# Recommended Implementation Architecture
+
+```text
+load_data()
+
+evaluate_condition(user, condition)
+    ├── eq
+    ├── in
+    ├── regex
+    └── approximate
+
+is_user_in_rollout(flag, user)
+
+rule_conditions_match(user, rule)
+
+rule_matches(user, flag, rule)
+
+evaluate_flag(user, flag)
+
+evaluate_all_flags(user, flags)
+
+evaluate_all_users(users, flags)
+
+validate_results(...)
+```
+
+---
+
+# Python Reference Solution
+
+```python
+import json
+import re
+import hashlib
+from typing import Any, Dict, List
+
+
+def evaluate_condition(
+    user: Dict[str, Any],
+    condition: Dict[str, Any],
+) -> bool:
+    """
+    Evaluate one condition against one user.
+
+    Supported operators:
+    - eq
+    - in
+    - regex
+    - ~=
+
+    Missing values fail safely.
+    """
+
+    attribute = condition.get("attribute")
+    operator = condition.get("operator")
+    expected = condition.get("value")
+
+    actual = user.get(attribute)
+
+    if actual is None:
+        return False
+
+    if operator == "eq":
+        return actual == expected
+
+    if operator == "in":
+        if not isinstance(expected, (list, tuple, set)):
+            return False
+
+        return actual in expected
+
+    if operator == "regex":
+        try:
+            # re.match is anchored at the beginning.
+            return re.match(str(expected), str(actual)) is not None
+        except re.error:
+            return False
+
+    if operator == "~=":
+        return approximate_match(actual, expected)
+
+    return False
+
+
+def approximate_match(
+    actual: Any,
+    expected: Any,
+) -> bool:
+    """
+    Placeholder interpretation.
+
+    Replace this behavior if expected_decisions.json proves
+    a different ~= semantic.
+    """
+
+    if (
+        isinstance(actual, (int, float))
+        and isinstance(expected, (int, float))
+    ):
+        return abs(actual - expected) < 1e-9
+
+    return str(expected).lower() in str(actual).lower()
+
+
+def rule_conditions_match(
+    user: Dict[str, Any],
+    rule: Dict[str, Any],
+) -> bool:
+    """
+    Conditions within one rule use logical AND.
+    """
+
+    conditions = rule.get("conditions", [])
+
+    return all(
+        evaluate_condition(user, condition)
+        for condition in conditions
+    )
+
+
+def stable_bucket(
+    flag_key: str,
+    user_id: Any,
+) -> int:
+    """
+    Deterministically maps a flag + user into [0, 99].
+
+    IMPORTANT:
+    Use this only if fixture analysis confirms this hashing strategy.
+    """
+
+    raw = f"{flag_key}:{user_id}".encode("utf-8")
+
+    digest = hashlib.sha256(raw).hexdigest()
+
+    return int(digest[:8], 16) % 100
+
+
+def passes_percentage_rollout(
+    user: Dict[str, Any],
+    flag: Dict[str, Any],
+    rule: Dict[str, Any],
+) -> bool:
+    """
+    Evaluates optional percentage rollout.
+    """
+
+    percentage = rule.get("percentage")
+
+    if percentage is None:
+        return True
+
+    try:
+        percentage = float(percentage)
+    except (TypeError, ValueError):
+        return False
+
+    if percentage <= 0:
+        return False
+
+    if percentage >= 100:
+        return True
+
+    user_id = user.get("user_id")
+
+    if user_id is None:
+        return False
+
+    bucket = stable_bucket(
+        flag_key=flag.get("key", ""),
+        user_id=user_id,
+    )
+
+    return bucket < percentage
+
+
+def rule_matches(
+    user: Dict[str, Any],
+    flag: Dict[str, Any],
+    rule: Dict[str, Any],
+) -> bool:
+    """
+    A rule matches when:
+
+    1. every condition matches
+    2. optional percentage rollout includes the user
+    """
+
+    if not rule_conditions_match(user, rule):
+        return False
+
+    if not passes_percentage_rollout(user, flag, rule):
+        return False
+
+    return True
+
+
+def evaluate_flag(
+    user: Dict[str, Any],
+    flag: Dict[str, Any],
+) -> bool:
+    """
+    Evaluate one feature flag for one user.
+
+    Semantics:
+
+    1. Disabled -> default immediately
+    2. Evaluate all applicable rules
+    3. No matching rules -> default
+    4. Any matching true rule -> true
+    5. Only matching false rules -> false
+    """
+
+    default = bool(flag.get("default", False))
+
+    # Disabled flags ignore all rules.
+    if not flag.get("enabled", False):
+        return default
+
+    matched = False
+
+    for rule in flag.get("rules", []):
+        if not rule_matches(user, flag, rule):
+            continue
+
+        matched = True
+
+        # True-wins allows early termination.
+        if rule.get("value") is True:
+            return True
+
+    if matched:
+        return False
+
+    return default
+
+
+def evaluate_all_flags(
+    user: Dict[str, Any],
+    flags: List[Dict[str, Any]],
+) -> Dict[str, bool]:
+    """
+    Evaluate every flag for one user.
+    """
+
+    return {
+        flag["key"]: evaluate_flag(user, flag)
+        for flag in flags
+    }
+
+
+def evaluate_all_users(
+    users: List[Dict[str, Any]],
+    flags: List[Dict[str, Any]],
+) -> Dict[str, Dict[str, bool]]:
+    """
+    Evaluate every flag for every user.
+    """
+
+    results = {}
+
+    for user in users:
+        user_id = str(user["user_id"])
+
+        results[user_id] = evaluate_all_flags(
+            user,
+            flags,
+        )
+
+    return results
+```
+
+---
+
+# Load JSON Files
+
+```python
+def load_json(path: str):
+    with open(path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+flags = load_json("flags.json")
+users = load_json("user.json")
+expected = load_json("expected_decisions.json")
+```
+
+---
+
+# Validation Harness
+
+```python
+def validate_results(
+    users,
+    flags,
+    expected,
+):
+    users_by_id = {
+        str(user["user_id"]): user
+        for user in users
+    }
+
+    total = 0
+    passed = 0
+    failures = []
+
+    for user_id, expected_flags in expected.items():
+
+        user = users_by_id.get(str(user_id))
+
+        if user is None:
+            failures.append({
+                "user_id": user_id,
+                "error": "user not found",
+            })
+
+            continue
+
+        actual_flags = evaluate_all_flags(
+            user,
+            flags,
+        )
+
+        for flag_key, expected_value in expected_flags.items():
+
+            total += 1
+
+            actual_value = actual_flags.get(flag_key)
+
+            if actual_value == expected_value:
+                passed += 1
+
+            else:
+                failures.append({
+                    "user_id": user_id,
+                    "flag": flag_key,
+                    "expected": expected_value,
+                    "actual": actual_value,
+                })
+
+    print(f"Passed: {passed}/{total}")
+
+    if total:
+        print(f"Accuracy: {passed / total:.2%}")
+
+    return failures
+```
+
+Usage:
+
+```python
+failures = validate_results(
+    users,
+    flags,
+    expected,
+)
+
+for failure in failures[:20]:
+    print(failure)
+```
+
+---
+
+# Important Optimization
+
+Because conflict behavior is:
+
+```text
+true wins
+```
+
+you can short-circuit.
+
+Instead of collecting all rule values:
+
+```python
+matched_values = []
+```
+
+you can do:
+
+```python
+for rule in rules:
+
+    if not rule_matches(...):
+        continue
+
+    matched = True
+
+    if rule["value"] is True:
+        return True
+```
+
+This is simpler and faster.
+
+---
+
+# Potential Operator Registry
+
+If operators grow significantly, refactor:
+
+```python
+if operator == "eq":
+    ...
+
+if operator == "in":
+    ...
+
+if operator == "regex":
+    ...
+```
+
+into:
+
+```python
+OPERATORS = {
+    "eq": evaluate_eq,
+    "in": evaluate_in,
+    "regex": evaluate_regex,
+    "~=": evaluate_approximate,
+}
+```
+
+But do **not** introduce this abstraction prematurely.
+
+With four operators, a simple conditional implementation is perfectly acceptable.
+
+---
+
+# High-Value Test Cases
+
+## Disabled Flag
+
+```text
+enabled = false
+default = true
+matching true rule exists
+
+expected = true
+```
+
+Rules must be ignored.
+
+---
+
+## No Match
+
+```text
+enabled = true
+default = false
+no rules match
+
+expected = false
+```
+
+---
+
+## AND Conditions
+
+```text
+country = US ✅
+plan = free ❌
+
+rule requires:
+country = US
+AND
+plan = enterprise
+
+expected rule match = false
+```
+
+---
+
+## True Wins
+
+```text
+rule A => false
+rule B => true
+
+both match
+
+expected = true
+```
+
+---
+
+## Matching False Overrides Default True
+
+Important edge case:
+
+```text
+default = true
+
+matching rule => false
+
+expected = false
+```
+
+This verifies:
+
+```text
+no match -> default
+```
+
+is not the same as:
+
+```text
+all matched rules are false -> default
+```
+
+---
+
+## Regex Anchoring
+
+If:
+
+```text
+pattern = abc
+actual = xyzabc
+```
+
+with anchored matching:
+
+```text
+expected = false
+```
+
+But:
+
+```text
+actual = abcxyz
+```
+
+may match.
+
+---
+
+## Percentage Boundaries
+
+```text
+percentage = 0
+=> false
+
+percentage = 100
+=> true
+```
+
+Also verify deterministic bucket boundaries.
+
+---
+
+## Dirty Data
+
+Test:
+
+```python
+{
+    "country": "",
+    "plan": ""
+}
+```
+
+Ensure evaluation does not crash.
+
+---
+
+# Strong Interview Narration
+
+Use short comments while working.
+
+## Before Coding
+
+> "I'm separating semantic discovery from implementation because the fixtures contain behavior that isn't fully specified."
+
+## Before Condition Evaluator
+
+> "I'll start with the smallest semantic primitive so failures remain easy to localize."
+
+## Before Percentage Logic
+
+> "I don't want to invent rollout semantics, so I'll derive them from the oracle."
+
+## After Partial Oracle Results
+
+> "Rather than patching individual failures, I'll cluster mismatches and look for a shared violated invariant."
+
+## Before Cleanup
+
+> "Now that behavior is validated, I'll make small readability improvements without risking a broad refactor."
+
+---
+
+# Best AI Workflow
+
+```text
+Observe
+   ↓
+Form hypothesis
+   ↓
+Ask Claude to challenge it
+   ↓
+Define invariant
+   ↓
+Implement smallest unit
+   ↓
+Run focused tests
+   ↓
+Run oracle comparison
+   ↓
+Cluster mismatches
+   ↓
+Fix root cause
+   ↓
+Repeat
+```
+
+---
+
+# Weak AI Workflow
+
+Avoid:
+
+```text
+requirements
+    ↓
+"Claude, solve this"
+    ↓
+500 lines of generated code
+    ↓
+debug blindly
+```
+
+---
+
+# Reusable Claude Interview Prompt Template
+
+Keep this in a scratch file.
+
+```text
+CURRENT MILESTONE
+
+I am implementing:
+[one small capability]
+
+KNOWN SEMANTICS
+
+- ...
+- ...
+- ...
+
+UNRESOLVED QUESTION
+
+[one ambiguity only]
+
+CURRENT INVARIANT
+
+[what must remain true]
+
+CURRENT CODE
+
+[small relevant code only]
+
+OBSERVATION
+
+Expected:
+...
+
+Actual:
+...
+
+YOUR TASK
+
+Do not solve the whole problem.
+
+1. Check whether my reasoning is sound.
+2. Identify assumptions I'm making.
+3. Give the smallest experiment that resolves the uncertainty.
+4. Suggest focused tests.
+5. Only provide implementation changes if the semantics are sufficiently established.
+6. Preserve already-passing behavior.
+```
+
+---
+
+# Final Interview Checklist
+
+## Requirements
+
+- [ ] Disabled flag behavior understood
+- [ ] Default behavior understood
+- [ ] AND semantics confirmed
+- [ ] Conflict resolution confirmed
+- [ ] Regex semantics confirmed
+- [ ] `~=` semantics confirmed
+- [ ] Percentage rollout semantics confirmed
+
+## Implementation
+
+- [ ] `evaluate_condition`
+- [ ] `rule_conditions_match`
+- [ ] `passes_percentage_rollout`
+- [ ] `rule_matches`
+- [ ] `evaluate_flag`
+- [ ] `evaluate_all_flags`
+- [ ] `evaluate_all_users`
+
+## Validation
+
+- [ ] Run expected decisions
+- [ ] Report passed / total
+- [ ] Cluster mismatches
+- [ ] Investigate dirty data separately
+- [ ] Add regression tests
+
+## Final Review
+
+- [ ] Remove unnecessary abstractions
+- [ ] Keep semantic comments
+- [ ] Explain complexity
+- [ ] Explain oracle usage
+- [ ] Mention one scaling improvement
+
+---
+
+# What the Interviewer Should See
+
+The interviewer should observe this pattern:
+
+```text
+You choose the milestone
+        ↓
+You state the invariant
+        ↓
+Claude challenges assumptions
+        ↓
+Claude helps with a bounded step
+        ↓
+You inspect the output
+        ↓
+You run validation
+        ↓
+You interpret failures
+        ↓
+You choose the next step
+```
+
+The goal is to make it clear that **Claude is your engineering assistant, not the owner of the solution**.

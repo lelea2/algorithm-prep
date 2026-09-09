@@ -17,7 +17,7 @@
       "docRelative": "ai_coding_experience_interview_script.mdx"
     },
     "ai-coding/ai_coding_steps.mdx": {
-      "hash": "04475f00d1df5d9bd00396a9ae87ccff59c08060d8c08d6f65a254f3544779a7",
+      "hash": "b1405c3d05d1f37b33a2a819597388223f5af58c18ff93cdc6e42e152f7977e7",
       "docRelative": "ai_coding_steps.mdx"
     },
     "ai-coding/ai_observability_study.mdx": {
@@ -27,6 +27,10 @@
     "ai-coding/evaluate_feature.py": {
       "hash": "7b91c33f92e2a2b3435a7d337359365465ce30c264edc4ee01f59a6a0e034f5a",
       "docRelative": "evaluate_feature.mdx"
+    },
+    "ai-coding/feature_flag_ai_interview_playbook.mdx": {
+      "hash": "3937823c69c5bb0b76007bbf4f82d102d67414aa69372f0f2a31891019699cec",
+      "docRelative": "feature_flag_ai_interview_playbook.mdx"
     }
   }
 }

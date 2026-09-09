@@ -15,6 +15,28 @@ title: 'AI Template strategy'
 55–60  explain + complexity/tradeoffs
 ```
 
+```
+1. Inspect files/schema
+2. Extract semantics
+3. Implement eq / in
+4. Implement regex
+5. Determine ~= behavior
+6. Implement evaluateCondition
+7. Implement AND rule matching
+8. Verify disabled flag behavior
+9. Infer multi-rule conflict using oracle
+10. Implement true-wins aggregation
+11. Infer rollout behavior using oracle
+12. Implement deterministic rollout
+13. Implement all-flags evaluation
+14. Compare 1,400 expected results
+15. Cluster failures
+16. Separate dirty-data mismatches
+17. Add regression tests
+18. Add concise semantic comments
+19. Final refactor only after 100% clean-data accuracy
+```
+
 ### Prompt1: Analyze, don't solve -- Understand semantics
 
 ```
@@ -153,6 +175,57 @@ Use fixture evidence if available. Do not guess.
 
 ### Prompt5: infer conflict behavior, evidence-driven investigation
 
-```
+This is where expected_decisions.js become useful
 
 ```
+I need to verify how multiple matching rules are aggregated.
+
+Hypotheses:
+
+H1: first matching rule wins
+H2: last matching rule wins
+H3: any true matched rule => true
+H4: some explicit priority exists
+
+Using flags.json, users.json, and expected_decisions.json:
+
+Find the smallest number of examples that distinguish these hypotheses.
+
+For each example show only:
+- user_id
+- flag
+- matched rule names
+- matched rule values
+- expected final decision
+- which hypotheses are eliminated
+
+Do not modify the implementation.
+```
+
+### Prompt6: Single flag evaluation milestones
+
+```
+I'm implementing evaluateFlag(user, flag).
+
+Intended semantics:
+
+1. if flag.enabled === false:
+      return flag.default
+
+2. evaluate all applicable rules
+
+3. if no rule matches:
+      return flag.default
+
+4. if multiple rules match:
+      true wins if any matched rule has value === true
+
+I want to preserve these semantics explicitly rather than compressing the code.
+
+Please:
+- review this logic for missing cases
+- suggest 6 focused tests
+- identify anything related to percentage rollout that I should intentionally leave unresolved for the next milestone
+```
+
+###
