@@ -13,7 +13,7 @@
       "docRelative": "autocomplete.png"
     },
     "frontend-system-design/camera-motion.png": {
-      "hash": "79653351a020b608eb8fc285863eac4b4d0bf2aaa004b8c3e6589e748314292a",
+      "hash": "ca14488e1d03f9b1dac6945f42b861d71ea709e50b7fa4ee8b1dea34af99eebd",
       "docRelative": "camera-motion.png"
     },
     "frontend-system-design/chatapp.png": {
@@ -39,10 +39,6 @@
     "frontend-system-design/design-calendar.png": {
       "hash": "e4906ec1cd39b1526e4d0acdbebaf8eaa960640a16b8067d03ca480f67ac6db6",
       "docRelative": "design-calendar.png"
-    },
-    "frontend-system-design/excalidraw/large-scale-node-link-visualization-architecture.svg": {
-      "hash": "a8e317b80fca68714266cc8dee85745a280ce4771e088cb820ecc40f76eaebdf",
-      "docRelative": "excalidraw/large-scale-node-link-visualization-architecture.svg"
     },
     "frontend-system-design/figma.png": {
       "hash": "2c37c162b2abbc878aa7d6d29d601de73f232b0500d50ab43136f716b6304229",
@@ -104,9 +100,9 @@
       "hash": "5706f698170b87bd9abca32ba0857b32e6bc48301d1a8b191be144aff80f2892",
       "docRelative": "autocomplete.mdx"
     },
-    "frontend-system-design/camera-motion-grid-system-design.mdx": {
-      "hash": "07dffa3403cd897bf209bbb47eda14ce5934ebe814de68d6a8eb56dc5d163394",
-      "docRelative": "camera-motion-grid-system-design.mdx"
+    "frontend-system-design/camera-motion-grid.mdx": {
+      "hash": "baa7e47cb79fc26c0654af275e55938a39e0cfe02a755e782f32e621c74eaaae",
+      "docRelative": "camera-motion-grid.mdx"
     },
     "frontend-system-design/chatapp.mdx": {
       "hash": "6fbeb992cc0b9633847f12120c7632efedb2f4ff07f8c564510e5e04c4dad492",
@@ -185,7 +181,7 @@
       "docRelative": "date-picker-design.mdx"
     },
     "frontend-system-design/design-google-calendar-frontend-system-design.mdx": {
-      "hash": "651b8b3b59dd58bfabfbddbfe1ccfb61eb4fda58cd30ef1f526c0904e5be92a5",
+      "hash": "65cca7849ccf7128cc794ee14fb0ca2e2be02a082de4a4c6627336d3b2f78dd0",
       "docRelative": "design-google-calendar-frontend-system-design.mdx"
     },
     "frontend-system-design/figma.mdx": {
@@ -229,7 +225,7 @@
       "docRelative": "sprint-board.mdx"
     },
     "frontend-system-design/theme-design.mdx": {
-      "hash": "c05cbf1d3a0412b7e807da8974b417f36e75fe5f4d9fd8973f3b35a503c484a0",
+      "hash": "5feb1b44f6e9fd7518319a3e9b3dd23e3cdb5d3ea3ff140275b898a6db128fa9",
       "docRelative": "theme-design.mdx"
     },
     "frontend-system-design/travel-booking.mdx": {
