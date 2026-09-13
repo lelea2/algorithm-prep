@@ -21,7 +21,7 @@
       "docRelative": "chatapp.png"
     },
     "frontend-system-design/chatgpt.png": {
-      "hash": "21d565565a3c30b078cd2d0b22555c66e9842210892518390d4ce38e4d1f638b",
+      "hash": "685263d554fab17c9e9e1d39503082c48c6279d0f2c6ea3faafc12f5122de501",
       "docRelative": "chatgpt.png"
     },
     "frontend-system-design/client-cache.png": {
@@ -113,12 +113,8 @@
       "docRelative": "chatapp.mdx"
     },
     "frontend-system-design/chatgpt.mdx": {
-      "hash": "4cd4b7d61d84e0f1c7cbb7733845105fd656be606a44fbbfbabbfff80cf1c57e",
+      "hash": "204deef164425e1ce2e0e9426baefda982e549feb3ec450b246131ee6b640640",
       "docRelative": "chatgpt.mdx"
-    },
-    "frontend-system-design/claude-ai-spreadsheet-agent-interview-guide.mdx": {
-      "hash": "1cfafe5dda3ea44b53f27b187487900d4bf83e6ae6a0e34d6a8615b6a31e1f5f",
-      "docRelative": "claude-ai-spreadsheet-agent-interview-guide.mdx"
     },
     "frontend-system-design/client-cache.mdx": {
       "hash": "482aa8be4a5950312b2a21c4e1ba2a8886093c2c6e4863093c23dd6be3eba588",
@@ -217,7 +213,7 @@
       "docRelative": "photo-sharing.mdx"
     },
     "frontend-system-design/pinterest.mdx": {
-      "hash": "f27069131c904a7deac34569f67edcf712b78f5953f760fbf746911b97156808",
+      "hash": "4b4dfc17a9ecfd7ed7256547fa2fbf2741f6a86df7062cbecc0709da27510962",
       "docRelative": "pinterest.mdx"
     },
     "frontend-system-design/poll-widget.mdx": {
