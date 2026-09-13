@@ -57,7 +57,7 @@
       "docRelative": "google-docs.png"
     },
     "frontend-system-design/newsfeed.png": {
-      "hash": "7c32bed9378a970683aa76380ad349cac4434cec781db46acf6504823a8b8857",
+      "hash": "d00a826531da42cc486c9109de543756f9649cf67ec6ca7f17045508b02b4839",
       "docRelative": "newsfeed.png"
     },
     "frontend-system-design/photo-sharing.png": {
@@ -201,7 +201,7 @@
       "docRelative": "masonry-layout-system-design.mdx"
     },
     "frontend-system-design/news-feed.mdx": {
-      "hash": "439b01f76dec2dbcd075ab3e102765eebb94df5e2a5edecd1965d582071c1187",
+      "hash": "f22e331adefabfd573c3ee9bb79fcae63f740be5ab5fb7aa9807d599bfdc9873",
       "docRelative": "news-feed.mdx"
     },
     "frontend-system-design/photo-sharing.mdx": {
