@@ -41,7 +41,7 @@
       "docRelative": "design-calendar.png"
     },
     "frontend-system-design/figma.png": {
-      "hash": "2c37c162b2abbc878aa7d6d29d601de73f232b0500d50ab43136f716b6304229",
+      "hash": "53090476ba1b540f21821051a3b4a5632d39a3ee5dac26eec2a660328856b83c",
       "docRelative": "figma.png"
     },
     "frontend-system-design/generative-fill-design.png": {
@@ -113,7 +113,7 @@
       "docRelative": "chatgpt.mdx"
     },
     "frontend-system-design/client-cache.mdx": {
-      "hash": "482aa8be4a5950312b2a21c4e1ba2a8886093c2c6e4863093c23dd6be3eba588",
+      "hash": "a24a33c359dd1e06ea4972ba619fbd74c49a34d9be2d79cfec596f75228337ad",
       "docRelative": "client-cache.mdx"
     },
     "frontend-system-design/core/XSS-vs-CORS.mdx": {
