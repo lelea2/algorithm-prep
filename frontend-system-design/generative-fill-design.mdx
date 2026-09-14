@@ -3,6 +3,10 @@ title: 'Design Generative Fill + AI Agent'
 description: 'Staff-level frontend/system-design interview notes: Generative Fill, agentic editing, LLM/tool boundaries, undo/redo, document state, and production SSE.'
 ---
 
+> **Editable diagram:** [Open in Excalidraw](https://excalidraw.com/#room=2893dbf2acbe3be882b9,LXvbxOw3-DYtFKPc0q8u7A)
+
+![Design](./generative-fill-design.png)
+
 ```
 User
   │
@@ -70,8 +74,6 @@ Browser ◄──────── image assets ───────── CDN
 - CDN/object-store delivery instead of streaming image bytes through SSE
 - security, prompt injection, authorization and signed asset access
 - observability, failure scenarios and a 10-minute interview walkthrough
-
-![Design](./generative-fill-design.png)
 
 # Design Generative Fill + AI Agent for Photoshop on the Web
 
