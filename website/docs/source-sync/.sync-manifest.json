@@ -1320,6 +1320,10 @@
       "hash": "7c2267e081598bb7d124259057c6691ec43d3abb87075fc991b25ef6ae04d9d2",
       "docRelative": "frontend/react-interview/Pagination/Pagination.jsx.mdx"
     },
+    "frontend/react-interview/PasswordForm.js": {
+      "hash": "efa2ea882fb5e6d0fc756a47136807f8df0f17e23419b8cc830d39b19745164e",
+      "docRelative": "frontend/react-interview/PasswordForm.mdx"
+    },
     "frontend/react-interview/PriceBreakdown/PriceBreakdown.css": {
       "hash": "7bdf89f876318a8716fe527f888a48c6936a523c29a1e52c3900ec56410892ef",
       "docRelative": "frontend/react-interview/PriceBreakdown/PriceBreakdown.css.mdx"
@@ -1889,7 +1893,7 @@
       "docRelative": "algorithm/array/maxProductSubArray.mdx"
     },
     "algorithm/array/maxStockProfit.js": {
-      "hash": "5b02527522e5ed4c54f989a4614c281c36c450c0ff5c7767c076f8be2877f8be",
+      "hash": "e530fde9d7df39245993b1cb6dde2e3b891fe2e04b56a9db4e544fe9285220ff",
       "docRelative": "algorithm/array/maxStockProfit.mdx"
     },
     "algorithm/array/maxSumSubArray.py": {
@@ -2529,7 +2533,7 @@
       "docRelative": "frontend/react-component-interview/hooks/_index.mdx"
     },
     "__nav__:frontend/react-interview": {
-      "hash": "6d25b5b51ee15804f4e45fec93485120fd59d67bb68205856b4f55773b40ef49",
+      "hash": "dfdc67b3b7554a1ef77e0fbb6febdb2aaa4b1fb5376b30a5354d52f3ef161ee7",
       "docRelative": "frontend/react-interview/_index.mdx"
     },
     "__nav__:frontend/react-interview/Accordion": {
