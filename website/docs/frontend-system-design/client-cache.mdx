@@ -1,6 +1,6 @@
 ---
 title: 'Client Cache Design'
-description: 'Staff Engineer interview guide for a browser-side client cache: query keys, TTL/SWR, mutation and invalidation strategy, race conditions, request dedupe, memory bounds, and HTTP cache integration.'
+description: 'Staff Engineer interview guide for a browser-side client cache: fetch/cache policies, query keys, TTL/SWR, mutation and invalidation strategy, race conditions, request dedupe, memory bounds, and HTTP cache integration.'
 sidebar_label: 'Client Cache Design'
 ---
 
@@ -1359,6 +1359,249 @@ Dangerous when backend filtering/ranking logic is complex.
 ### Trap 6: "React Context can hold all server state"
 
 Possible for tiny apps, but broad Context updates can create unnecessary rerenders and poor cache encapsulation.
+
+---
+
+## 38. Read / Fetch Policies
+
+Section 9's read path always follows the same rule — fresh cache, else network — but real UIs need finer control per query. That control is a `FetchPolicy`:
+
+```ts
+type FetchPolicy =
+  | 'cache-only'
+  | 'network-only'
+  | 'cache-first'
+  | 'cache-and-network'
+  | 'stale-while-revalidate'
+  | 'no-cache';
+```
+
+| Policy                   | Behavior                                                                           | Good for                                                   |
+| ------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `cache-only`             | Return cached data only; never hit the network; error/empty on a miss              | Offline mode, preloaded/static data                        |
+| `network-only`           | Always hit the network and overwrite the cache                                     | Highly dynamic or security-sensitive reads                 |
+| `cache-first`            | Return fresh cache immediately; hit the network only on a miss or once stale       | Mostly static data                                         |
+| `cache-and-network`      | Return cache immediately (if present) **and** kick off a background refresh        | Dashboards, product surfaces where perceived speed matters |
+| `stale-while-revalidate` | Same behavior as `cache-and-network`, treated as the default rather than an opt-in | Strong default for most product reads                      |
+| `no-cache`               | Hit the network but never persist the result                                       | One-off or sensitive reads (e.g. a token exchange)         |
+
+### Wiring policy into the read path
+
+The policy decides _when_ the network runs and _whether_ its result is trusted over the cache. Everything else from section 9 — the in-flight map for deduplication, the generation check from section 18 that guards against stale responses — stays identical regardless of policy:
+
+```ts
+async function query<T>({
+  key,
+  fetcher,
+  staleTime = 60_000,
+  policy = 'cache-first',
+}: {
+  key: unknown[];
+  fetcher: () => Promise<T>;
+  staleTime?: number;
+  policy?: FetchPolicy;
+}): Promise<T> {
+  const cacheKey = hashKey(key);
+  const cached = cache.get(cacheKey) as QueryEntry<T> | undefined;
+  const now = Date.now();
+  const isFresh = cached?.data !== undefined && now < cached.staleAt;
+
+  if (policy === 'cache-only') {
+    if (cached?.data === undefined) {
+      throw new Error('Cache miss for cache-only policy');
+    }
+    return cached.data;
+  }
+
+  if (policy === 'cache-first' && isFresh) {
+    return cached!.data as T;
+  }
+
+  if (
+    (policy === 'cache-and-network' || policy === 'stale-while-revalidate') &&
+    cached?.data !== undefined
+  ) {
+    // Serve the cache immediately; refresh happens in the background using
+    // the same in-flight/generation machinery as any other request.
+    void query({ key, fetcher, staleTime, policy: 'network-only' });
+    return cached.data;
+  }
+
+  // network-only, no-cache, and cache misses all fall through to a real
+  // request. `no-cache` is identical except the result is never persisted.
+  const request = fetcher();
+
+  if (policy !== 'no-cache') {
+    request.then((data) => {
+      cache.set(cacheKey, {
+        data,
+        updatedAt: Date.now(),
+        staleAt: Date.now() + staleTime,
+        generation: cached?.generation ?? 0,
+        subscribers: cached?.subscribers ?? new Set(),
+      });
+      notify(cacheKey);
+    });
+  }
+
+  return request;
+}
+```
+
+### Typical default
+
+```text
+stale-while-revalidate (== cache-and-network)
+```
+
+is the strongest default for product UI: users see cached data instantly, and it self-heals in the background without a loading spinner.
+
+### Policy is also how "offline" gets modeled
+
+`navigator.onLine` is only a hint (see section 27), but it is a convenient signal to force reads down to `cache-only` and hold mutations in a queue rather than sending them `network-only`:
+
+```ts
+const policy: FetchPolicy = navigator.onLine ? 'stale-while-revalidate' : 'cache-only';
+```
+
+---
+
+## 39. Query Key Factories
+
+Section 7 covers what must go _into_ a key. In practice, keys stay correct — and hierarchical invalidation stays easy — behind a small factory instead of hand-written arrays scattered across the app:
+
+```ts
+type UserFilters = {
+  teamId?: number;
+  status?: 'active' | 'inactive';
+};
+
+const userKeys = {
+  all: ['users'] as const,
+  lists: () => [...userKeys.all, 'list'] as const,
+  list: (filters: UserFilters) => [...userKeys.lists(), filters] as const,
+  detail: (id: string) => [...userKeys.all, 'detail', id] as const,
+};
+```
+
+This buys hierarchical invalidation for free:
+
+```ts
+// Invalidate every user query (every list and every detail).
+client.invalidate(userKeys.all);
+
+// Invalidate only one user's detail query.
+client.invalidate(userKeys.detail('2'));
+```
+
+The same pattern covers pagination. For page-based pagination, the page number lives in the key so pages coexist independently:
+
+```ts
+userKeys.list({ teamId: 42, page: 1 });
+userKeys.list({ teamId: 42, page: 2 });
+```
+
+For cursor pagination, an infinite query instead accumulates pages under a single key:
+
+```ts
+type InfiniteQueryEntry<T> = {
+  pages: T[];
+  pageParams: unknown[];
+  nextCursor?: string;
+};
+```
+
+---
+
+## 40. Cache Model Comparison: Normalized Entities vs Query-Result Cache
+
+Section 17 introduced normalized entity caching. Two real-world libraries sit at either end of the spectrum, and picking one matters for the "query result cache vs normalized entity cache" tradeoff in section 34.
+
+### Query-result caching (TanStack Query style)
+
+```text
+['users', { status: 'active' }]  ->  [User1, User2]
+['user', '1']                    ->  User1
+```
+
+The same entity (`User1`) may be duplicated across several cached query results. Consistency relies on explicitly invalidating or patching every affected key after a mutation, exactly as sections 14–16 describe.
+
+### Normalized entity caching (Apollo/Relay style)
+
+```text
+Entity Store
+User:1 -> { id: 1, name: 'Alice' }
+User:2 -> { id: 2, name: 'Bob' }
+
+Query Store
+activeUsers -> [User:1, User:2]
+```
+
+Updating `User:1` in the entity store automatically updates every query that references it — at the cost of more complex cache semantics and a dependency on a well-connected schema, which is why this model fits GraphQL particularly well.
+
+### Rule of thumb
+
+```text
+REST / mixed APIs, loosely connected entities  -> query-result cache (TanStack Query style)
+GraphQL, strongly connected entity graph       -> normalized cache (Apollo style)
+```
+
+Either model still needs everything covered above: correct cache keys, a deliberate fetch policy per read, generation/version checks against stale responses, and bounded memory.
+
+---
+
+## 41. Reference Implementation: Wiring This Up with TanStack Query
+
+Everything above is deliberately framed as a from-scratch `DataClient` so the underlying mechanics stay explicit. In production, most teams reach for a library like TanStack Query, which already implements the read path, deduplication, generation tracking, and GC — configured through the same policies described in section 38:
+
+```ts
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000, // fresh window — see section 11
+      gcTime: 5 * 60_000, // retention window — see section 11
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      retry: (failureCount, error) => {
+        if (error instanceof HttpError && error.status >= 400 && error.status < 500) {
+          return false; // don't retry client errors — see section 27
+        }
+        return failureCount < 3;
+      },
+    },
+  },
+});
+```
+
+Reads map directly onto the key-factory pattern from section 39 and default to `stale-while-revalidate` behavior:
+
+```ts
+function useUsers(filters: UserFilters) {
+  return useQuery({
+    queryKey: userKeys.list(filters),
+    queryFn: () => api.getUsers(filters),
+    staleTime: 30_000,
+  });
+}
+```
+
+Mutations pick the same three strategies as section 14 — here, patch the canonical detail and invalidate the lists whose membership may have changed:
+
+```ts
+function useUpdateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<User> }) => api.updateUser(id, patch),
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(userKeys.detail(updatedUser.id), updatedUser); // canonical response
+      queryClient.invalidateQueries({ queryKey: userKeys.lists() }); // membership may have changed
+    },
+  });
+}
+```
+
+The policy table in section 38, the key factory in section 39, and the cache-model choice in section 40 are exactly the decisions a library like this asks you to make — it just hides the deduplication and generation-tracking plumbing behind configuration.
 
 ---
 
