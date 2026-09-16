@@ -44,6 +44,10 @@
       "hash": "53090476ba1b540f21821051a3b4a5632d39a3ee5dac26eec2a660328856b83c",
       "docRelative": "figma.png"
     },
+    "frontend-system-design/frontend-perf-debug.png": {
+      "hash": "fad61cf4f73890f9f41ab38e4166af31519cbb347f8962c7802c9ee1507f88ff",
+      "docRelative": "frontend-perf-debug.png"
+    },
     "frontend-system-design/generative-fill-design.png": {
       "hash": "31441a845582c9863804ec8e53e2a151f2def9a4fdd88e94282a02c6d6e7164f",
       "docRelative": "generative-fill-design.png"
@@ -187,6 +191,10 @@
     "frontend-system-design/figma.mdx": {
       "hash": "873b505cb2d09b46b1a51725c636afa3e831d295f89287fdb809d7e3f66be744",
       "docRelative": "figma.mdx"
+    },
+    "frontend-system-design/frontend_performance_debug.mdx": {
+      "hash": "9d946041dfef1dc29f4f42d04f8402b3ce0b3c3122fea0e508e352a02396aa81",
+      "docRelative": "frontend_performance_debug.mdx"
     },
     "frontend-system-design/generative-fill-design.mdx": {
       "hash": "d2169e0745774ccab3e38844208b4f81998e5085d78b511885ea792f4f3b1327",
