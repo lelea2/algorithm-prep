@@ -188,9 +188,9 @@
       "hash": "cd48f96361d61c7ea0bbeacb40b09d437188effbff95cc829a4cdaa417771a77",
       "docRelative": "date-picker-design.mdx"
     },
-    "frontend-system-design/design-google-calendar-frontend-system-design.mdx": {
-      "hash": "65cca7849ccf7128cc794ee14fb0ca2e2be02a082de4a4c6627336d3b2f78dd0",
-      "docRelative": "design-google-calendar-frontend-system-design.mdx"
+    "frontend-system-design/design-calendar.mdx": {
+      "hash": "0e38f9264ef90e3591d728405c803e0fe2f75700e82c8785cc9a88661644420d",
+      "docRelative": "design-calendar.mdx"
     },
     "frontend-system-design/figma.mdx": {
       "hash": "873b505cb2d09b46b1a51725c636afa3e831d295f89287fdb809d7e3f66be744",
