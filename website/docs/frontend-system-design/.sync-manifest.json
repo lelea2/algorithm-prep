@@ -76,6 +76,10 @@
       "hash": "53425ba91fa4280c48a9b95c40e0e352e3b1a68bc32778dd7910fe3d3a088d94",
       "docRelative": "poll-widget.png"
     },
+    "frontend-system-design/resuable-datagrid.png": {
+      "hash": "b6a5ea715b899dc487434554f9f9b8e22dc10fa128776414e31dbc86a9dbe8a3",
+      "docRelative": "resuable-datagrid.png"
+    },
     "frontend-system-design/richtexteditor.png": {
       "hash": "592701c33e1c48937a82965d23d439d3ee486403cb4a542bb40003df2e51c187",
       "docRelative": "richtexteditor.png"
@@ -219,6 +223,10 @@
     "frontend-system-design/poll-widget.mdx": {
       "hash": "479f6ee5fdae429899d84a65ee827e42dc81beb6cc1206e139a413c0f4755de3",
       "docRelative": "poll-widget.mdx"
+    },
+    "frontend-system-design/reusable_datagrid_list_card_system.mdx": {
+      "hash": "1393c23eac80c61f8153f8c6ad00fc896dd0b725c64d50dccd2ad95036578fec",
+      "docRelative": "reusable_datagrid_list_card_system.mdx"
     },
     "frontend-system-design/rich-text-editor.mdx": {
       "hash": "cb1d3c631db998eea07f3fffa2fb37f312fdf8d887da477fa4e1e24a6812eee0",
