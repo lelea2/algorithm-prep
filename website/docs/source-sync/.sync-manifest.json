@@ -164,6 +164,10 @@
       "hash": "b563b3589097fb4f6fb0fd94fedc3f25aafe6cdffed00342f5b12e3432cbb3a7",
       "docRelative": "frontend/interview/mergeInterval.mdx"
     },
+    "frontend/interview/money-flow.js": {
+      "hash": "4be43e6687b9850b14091ba6527834c21b5d6c3c67da536ab88487f698fbb16d",
+      "docRelative": "frontend/interview/money-flow.mdx"
+    },
     "frontend/interview/packageDependencies.js": {
       "hash": "fa052b68caad1468fc20377cf567c69a3db715fbc5f8bf303c2834c2d5504d8b",
       "docRelative": "frontend/interview/packageDependencies.mdx"
@@ -2397,7 +2401,7 @@
       "docRelative": "frontend/css/_index.mdx"
     },
     "__nav__:frontend/interview": {
-      "hash": "1e6a44d495582f5048fdc22ede033ecfe31a1fe3b1549be29c28c6d9d51802a9",
+      "hash": "2b7bfe4bdd7b62f24bc0e520f01ecd3989af8248f9c949e1c7c8b712217f533e",
       "docRelative": "frontend/interview/_index.mdx"
     },
     "__nav__:frontend/jsfunction": {
