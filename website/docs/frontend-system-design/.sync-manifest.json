@@ -212,6 +212,10 @@
       "hash": "f22e331adefabfd573c3ee9bb79fcae63f740be5ab5fb7aa9807d599bfdc9873",
       "docRelative": "news-feed.mdx"
     },
+    "frontend-system-design/notification-frontend.mdx": {
+      "hash": "a296c140884443f4709cf9a2a8e977c62305e599e6fbbea0649a7fdccd522e22",
+      "docRelative": "notification-frontend.mdx"
+    },
     "frontend-system-design/photo-sharing.mdx": {
       "hash": "b043cd089e1dff44f14d8044c2d382b522d95b4f5177c333b99ea64cc49fddfc",
       "docRelative": "photo-sharing.mdx"
