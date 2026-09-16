@@ -196,10 +196,6 @@
       "hash": "1bb840fc2dab8564d65f68eb1e5cda96e2b90d5cd7f490e6adae1a0fbee83f73",
       "docRelative": "google-docs-design.mdx"
     },
-    "frontend-system-design/masonry-layout-system-design.mdx": {
-      "hash": "f1db19746175d3345d853c6e53b08d80b6b9aeec1938d418e2250827878ff87f",
-      "docRelative": "masonry-layout-system-design.mdx"
-    },
     "frontend-system-design/news-feed.mdx": {
       "hash": "f22e331adefabfd573c3ee9bb79fcae63f740be5ab5fb7aa9807d599bfdc9873",
       "docRelative": "news-feed.mdx"
@@ -209,7 +205,7 @@
       "docRelative": "photo-sharing.mdx"
     },
     "frontend-system-design/pinterest.mdx": {
-      "hash": "4b4dfc17a9ecfd7ed7256547fa2fbf2741f6a86df7062cbecc0709da27510962",
+      "hash": "b538ae839850fb5de9d0df8a9b6ec48f852b1b1623b6f981ed899cc109e81b3a",
       "docRelative": "pinterest.mdx"
     },
     "frontend-system-design/poll-widget.mdx": {
