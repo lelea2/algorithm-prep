@@ -1,0 +1,72 @@
+function TransactionsList() {
+  const [search, setSearch] = useState("");
+
+  // Aggregate total transaction amount per customer
+  const customerTotals = useMemo(() => {
+    return transactions.reduce((totals, transaction) => {
+      totals[transaction.customer] =
+        (totals[transaction.customer] || 0) + transaction.amount;
+
+      return totals;
+    }, {});
+  }, []);
+
+  // Find customer with highest total transaction amount
+  const topCustomer = useMemo(() => {
+    let topCustomer = null;
+    let maxAmount = -Infinity;
+
+    for (const [customer, total] of Object.entries(customerTotals)) {
+      if (total > maxAmount) {
+        maxAmount = total;
+        topCustomer = customer;
+      }
+    }
+
+    return topCustomer;
+  }, [customerTotals]);
+
+  // Filter transactions case-insensitively
+  const filteredTransactions = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return transactions;
+    }
+
+    return transactions.filter((transaction) =>
+      transaction.customer.toLowerCase().includes(query)
+    );
+  }, [search]);
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Filter by customer"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+      />
+
+      <ul>
+        {filteredTransactions.map((transaction) => {
+          const isTopCustomer = transaction.customer === topCustomer;
+
+          return (
+            <li key={transaction.id}>
+              <span
+                style={{
+                  backgroundColor: isTopCustomer ? "yellow" : "transparent",
+                  fontWeight: isTopCustomer ? "bold" : "normal"
+                }}
+              >
+                {transaction.customer}
+              </span>
+              : {transaction.amount}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}

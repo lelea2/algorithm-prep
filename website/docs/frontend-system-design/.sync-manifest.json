@@ -68,6 +68,10 @@
       "hash": "40505735958923e11e7bea51c6cf8641381bd86e77121a1156b68de86b511ead",
       "docRelative": "notification-frontend.png"
     },
+    "frontend-system-design/payment-monitoring-fe.png": {
+      "hash": "baa868ed70736f4f6e72f0eb58744c50fb5d540cd39e8596d4449e97bf4171e2",
+      "docRelative": "payment-monitoring-fe.png"
+    },
     "frontend-system-design/photo-sharing.png": {
       "hash": "c9ba32b43263fff5911072510b68d14250a0541d9840660d7f32eb8a15eb84ad",
       "docRelative": "photo-sharing.png"
@@ -221,7 +225,7 @@
       "docRelative": "notification-frontend.mdx"
     },
     "frontend-system-design/payment_monitor_frontend.mdx": {
-      "hash": "498fb71c6bae381583dea38821c759ac7f8939f108c1533cac5a26d5510f05eb",
+      "hash": "8482827296f100573903f8101367ff3f9171ebf759e75d165d9faabaa7db5770",
       "docRelative": "payment_monitor_frontend.mdx"
     },
     "frontend-system-design/photo-sharing.mdx": {
