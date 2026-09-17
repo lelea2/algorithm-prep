@@ -64,6 +64,10 @@
       "hash": "d00a826531da42cc486c9109de543756f9649cf67ec6ca7f17045508b02b4839",
       "docRelative": "newsfeed.png"
     },
+    "frontend-system-design/notification-frontend.png": {
+      "hash": "40505735958923e11e7bea51c6cf8641381bd86e77121a1156b68de86b511ead",
+      "docRelative": "notification-frontend.png"
+    },
     "frontend-system-design/photo-sharing.png": {
       "hash": "c9ba32b43263fff5911072510b68d14250a0541d9840660d7f32eb8a15eb84ad",
       "docRelative": "photo-sharing.png"
@@ -213,7 +217,7 @@
       "docRelative": "news-feed.mdx"
     },
     "frontend-system-design/notification-frontend.mdx": {
-      "hash": "a296c140884443f4709cf9a2a8e977c62305e599e6fbbea0649a7fdccd522e22",
+      "hash": "f6f6e58ae665c97f815da10ad834f4b018e44b9de2e3189516507ca2f606cfb7",
       "docRelative": "notification-frontend.mdx"
     },
     "frontend-system-design/photo-sharing.mdx": {
