@@ -220,6 +220,10 @@
       "hash": "f6f6e58ae665c97f815da10ad834f4b018e44b9de2e3189516507ca2f606cfb7",
       "docRelative": "notification-frontend.mdx"
     },
+    "frontend-system-design/payment_monitor_frontend.mdx": {
+      "hash": "498fb71c6bae381583dea38821c759ac7f8939f108c1533cac5a26d5510f05eb",
+      "docRelative": "payment_monitor_frontend.mdx"
+    },
     "frontend-system-design/photo-sharing.mdx": {
       "hash": "b043cd089e1dff44f14d8044c2d382b522d95b4f5177c333b99ea64cc49fddfc",
       "docRelative": "photo-sharing.mdx"

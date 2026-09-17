@@ -1,0 +1,1294 @@
+---
+title: 'Live Payment / Webhook / Alert Monitor'
+description: 'Staff-level frontend system design guide for a Stripe-like live payment, webhook, and alert monitoring dashboard: transport, ingestion pipeline, backpressure, virtualization, and reconnect strategy.'
+sidebar_label: 'Payment / Webhook Monitor'
+tags:
+  - frontend
+  - system-design
+  - react
+  - realtime
+  - payments
+  - staff-engineer
+---
+
+> **Editable diagram:** [Open in Excalidraw](https://excalidraw.com/#room=0d281fa03ff27eebdb50,xahrbBR70XpJ8CE51U1ifw)
+
+# Frontend System Design: Live Payment / Webhook / Alert Monitor
+
+## Problem
+
+Design the **client-side architecture** for a Stripe-like operational dashboard that displays high-volume, near-real-time updates such as:
+
+- Live payment status transitions
+- Webhook delivery logs
+- Refund events
+- Dispute alerts
+- Retry / failure events
+- Merchant operational alerts
+
+The frontend must remain responsive even when event volume spikes.
+
+---
+
+# 1. Requirements
+
+## Functional
+
+Users should be able to:
+
+1. View a continuously updating event stream.
+2. Inspect a payment, webhook, dispute, or refund.
+3. Filter by event type, payment status, webhook endpoint, failure status, and time range.
+4. Search by IDs such as `pi_*`, `evt_*`, `re_*`, and `dp_*`.
+5. Pause / resume live updates.
+6. Preserve scroll position while new events arrive.
+7. Show unread/new-event counts when the user is not at the top.
+8. Reconnect after transient network failures.
+9. Handle duplicate or out-of-order events.
+10. Work across multiple tabs.
+
+## Non-functional
+
+- Low INP and responsive interactions.
+- No full-list rerenders when one event changes.
+- Bounded memory.
+- Resilient to burst traffic.
+- Accessible.
+- Observable in production.
+- Reusable by multiple teams.
+
+---
+
+# 2. Clarify Scale
+
+Ask early:
+
+- Typical events/sec?
+- Peak burst?
+- How many rows can users inspect?
+- Is ordering strict or best-effort?
+- Is sub-second freshness required?
+- Are events immutable logs, mutable entities, or both?
+- Is history server-paginated?
+
+Assume:
+
+```text
+Typical: 10-50 events/sec
+Burst:   500-2,000 events/sec
+Visible rows: 30-100
+History: millions of events
+```
+
+Key consequence:
+
+> The browser must not render every incoming event immediately.
+
+---
+
+# 3. High-Level Architecture
+
+```text
+                        Backend
+                           |
+                  -------------------
+                  | REST / GraphQL  |
+                  | Live Stream API |
+                  -------------------
+                     |          |
+                     |          +------------------+
+                     |                             |
+                     v                             v
+              Initial snapshot                 SSE stream
+                     |                             |
+                     +-------------+---------------+
+                                   |
+                                   v
+                         Event Transport Layer
+                                   |
+                      parse / validate / sequence
+                                   |
+                                   v
+                           Event Buffer / Queue
+                                   |
+                 coalesce / dedupe / batch / throttle
+                                   |
+                                   v
+                         Client Data Store / Cache
+                        /          |            \
+                       /           |             \
+                      v            v              v
+                Entity Store   Event Log      UI Metadata
+                                                state
+                      \            |              /
+                       \           |             /
+                        +----------+------------+
+                                   |
+                                   v
+                           Selectors / Hooks
+                                   |
+                                   v
+                          Virtualized UI
+```
+
+---
+
+# 4. Transport Choice
+
+## REST + SSE
+
+Recommended default:
+
+- REST for initial snapshot and historical pagination.
+- SSE for server -> client live events.
+
+Why SSE fits:
+
+- One-way server-to-browser flow.
+- Native reconnect support.
+- Simpler than WebSocket.
+- Easy event IDs.
+- HTTP-friendly.
+- Good fit for operational streams.
+
+Example:
+
+```text
+GET /v1/activity?limit=100
+GET /v1/activity/stream
+```
+
+SSE event:
+
+```text
+id: 981245
+event: payment.updated
+data: {
+  "eventId": "evt_123",
+  "objectId": "pi_456",
+  "version": 18,
+  "status": "succeeded",
+  "createdAt": 1779100000
+}
+```
+
+## When WebSocket may be justified
+
+Use WebSocket when the client also needs:
+
+- subscriptions that change frequently
+- bidirectional control messages
+- collaborative interactions
+- multiplexed high-frequency streams
+
+For a monitor feed, SSE usually keeps the system simpler.
+
+---
+
+# 5. Initial Snapshot + Live Handoff
+
+Avoid this race:
+
+```text
+T1 request snapshot
+T2 event occurs
+T3 snapshot returns
+T4 stream starts
+
+event at T2 is lost
+```
+
+Safer design:
+
+```text
+GET /activity?limit=100
+
+response:
+{
+  items: [...],
+  cursor: "...",
+  stream_checkpoint: 981245
+}
+```
+
+Then:
+
+```text
+GET /activity/stream?after=981245
+```
+
+Alternative:
+
+1. Open stream first.
+2. Buffer events.
+3. Fetch snapshot.
+4. Merge buffered events.
+5. Render.
+
+Important interview phrase:
+
+> I want an explicit snapshot-to-stream consistency contract from the backend.
+
+---
+
+# 6. Event Data Model
+
+Do not use one giant array of full records.
+
+Separate entity state from event-log ordering.
+
+```ts
+type PaymentEntity = {
+  id: string;
+  status: 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded';
+  amount: number;
+  currency: string;
+  version: number;
+  updatedAt: number;
+};
+
+type ActivityEvent = {
+  eventId: string;
+  sequence: number;
+  type: 'payment.updated' | 'refund.created' | 'dispute.created' | 'webhook.failed';
+
+  entityType: 'payment' | 'refund' | 'dispute' | 'webhook';
+  entityId: string;
+  createdAt: number;
+};
+
+type ActivityStore = {
+  paymentsById: Map<string, PaymentEntity>;
+  eventIds: string[];
+  eventsById: Map<string, ActivityEvent>;
+
+  connection: {
+    status: 'connecting' | 'connected' | 'reconnecting' | 'offline';
+    lastSequence: number;
+  };
+};
+```
+
+Why normalize:
+
+```text
+eventIds
+  ↓
+evt_9
+evt_8
+evt_7
+
+eventsById
+  evt_9 -> payment pi_1
+  evt_8 -> webhook we_3
+
+paymentsById
+  pi_1 -> latest payment state
+```
+
+Benefits:
+
+- One entity update does not replace the whole feed.
+- Detail views and rows share the same entity cache.
+- Easier dedupe.
+- Lower render fan-out.
+
+---
+
+# 7. Event Ingestion Pipeline
+
+Incoming network events should **not** directly call React setters.
+
+Bad:
+
+```ts
+eventSource.onmessage = (event) => {
+  setEvents((prev) => [JSON.parse(event.data), ...prev]);
+};
+```
+
+At 1,000 events/sec this can trigger excessive:
+
+- allocations
+- scheduling
+- reconciliation
+- garbage collection
+
+Better:
+
+```text
+SSE
+ |
+ v
+Parser
+ |
+ v
+Input Queue
+ |
+ v
+Dedupe
+ |
+ v
+Coalescer
+ |
+ v
+Frame / Time Batch
+ |
+ v
+Store Commit
+ |
+ v
+React selectors
+```
+
+---
+
+# 8. Buffering and Batching
+
+Maintain an in-memory ingestion queue outside React.
+
+```ts
+const pendingEvents: ActivityEvent[] = [];
+
+eventSource.onmessage = (message) => {
+  pendingEvents.push(parse(message.data));
+};
+```
+
+Flush periodically:
+
+```ts
+const FLUSH_MS = 50;
+
+setInterval(() => {
+  if (!pendingEvents.length) return;
+
+  const batch = pendingEvents.splice(0, pendingEvents.length);
+  activityStore.applyBatch(batch);
+}, FLUSH_MS);
+```
+
+This converts:
+
+```text
+1000 network callbacks
+```
+
+into roughly:
+
+```text
+20 store commits/sec
+```
+
+when flushing every 50 ms.
+
+### Staff-level tradeoff
+
+Smaller batches:
+
+- fresher UI
+- more rendering overhead
+
+Larger batches:
+
+- less rendering work
+- slightly higher visible latency
+
+For an operational dashboard, 50-100 ms is often visually real-time while being much cheaper.
+
+---
+
+# 9. Coalescing
+
+Suppose one payment receives:
+
+```text
+processing
+processing
+processing
+succeeded
+```
+
+during one batch.
+
+The UI often only needs the newest entity state.
+
+```text
+Batch:
+pi_1 -> processing v15
+pi_2 -> pending    v2
+pi_1 -> processing v16
+pi_1 -> succeeded  v17
+
+Coalesced entity updates:
+pi_1 -> succeeded v17
+pi_2 -> pending   v2
+```
+
+Important distinction:
+
+- **Entity state** can be coalesced.
+- **Audit/event log entries** may still need all events.
+
+Keep those as separate concepts.
+
+---
+
+# 10. Ordering and Versioning
+
+Network streams may reconnect and resend events.
+
+Events can also arrive out of order.
+
+Require:
+
+```text
+eventId
+sequence
+entity version
+timestamp
+```
+
+Apply update only when newer:
+
+```ts
+if (incoming.version <= current.version) {
+  return;
+}
+```
+
+For event log dedupe:
+
+```ts
+if (eventsById.has(event.eventId)) {
+  return;
+}
+```
+
+Sequence gaps:
+
+```text
+last sequence = 100
+incoming = 103
+
+missing:
+101
+102
+```
+
+Client options:
+
+1. Fetch missing range.
+2. Refetch recent snapshot.
+3. Mark connection as degraded and reconcile.
+
+Prefer explicit recovery APIs.
+
+---
+
+# 11. Backpressure
+
+The server may send events faster than the UI can consume.
+
+```text
+Network stream
+      |
+      v
+bounded queue
+      |
+      +---- normal load ----> batch processor
+      |
+      +---- overload -------> coalesce / drop UI-only work
+```
+
+Do not allow:
+
+```text
+pendingEvents.length -> infinity
+```
+
+Example cap:
+
+```ts
+const MAX_PENDING = 10_000;
+```
+
+If queue exceeds threshold:
+
+- aggressively coalesce entity updates
+- preserve critical alert events
+- stop rendering intermediate states
+- optionally request a new snapshot
+
+Principle:
+
+> Correctness comes from authoritative server state, not from rendering every transient event.
+
+---
+
+# 12. UI State vs Server State
+
+## Server state
+
+```text
+events
+payments
+refunds
+disputes
+webhook attempts
+```
+
+## UI state
+
+```text
+filters
+selected event
+drawer state
+live mode
+scroll position
+new event badge
+column preferences
+```
+
+## URL state
+
+```text
+?type=webhook.failed
+&status=failed
+&endpoint=ep_123
+```
+
+URL state should represent shareable filters.
+
+---
+
+# 13. Rendering Architecture
+
+```text
+LiveMonitorPage
+│
+├── MonitorToolbar
+│   ├── Search
+│   ├── Filters
+│   ├── PauseLiveButton
+│   └── ConnectionStatus
+│
+├── NewEventsBanner
+│
+├── VirtualizedEventList
+│   └── EventRow
+│
+└── EventDetailDrawer
+```
+
+Rows subscribe to their own state.
+
+```tsx
+const EventRow = memo(({ eventId }) => {
+  const event = useEvent(eventId);
+  return <Row event={event} />;
+});
+```
+
+Avoid:
+
+```tsx
+<EventList events={allEvents} />
+```
+
+if the entire array identity changes on every batch.
+
+Prefer:
+
+```tsx
+<EventList eventIds={visibleEventIds} />
+```
+
+with row-level selectors.
+
+---
+
+# 14. Selector Granularity
+
+A selector should return only what the component needs.
+
+Bad:
+
+```ts
+useStore((state) => state);
+```
+
+Better:
+
+```ts
+useStore((state) => state.eventsById.get(eventId));
+```
+
+For status badge:
+
+```ts
+useStore((state) => state.paymentsById.get(paymentId)?.status);
+```
+
+Result:
+
+```text
+pi_123 status changes
+
+PaymentStatusBadge(pi_123)
+    rerenders
+
+unrelated rows
+    do not
+```
+
+---
+
+# 15. Virtualization
+
+Never render 50,000 DOM rows.
+
+```text
+50,000 logical records
+        |
+        v
+  viewport calculation
+        |
+        v
+~30-100 DOM rows
+```
+
+Discuss:
+
+- fixed vs variable row height
+- overscan
+- focus management
+- keyboard navigation
+- screen-reader accessibility
+- preserving scroll anchor
+
+---
+
+# 16. Preserve Scroll Position
+
+User is reading old events.
+
+New events arrive.
+
+Bad UX:
+
+```text
+new events inserted
+      ↓
+scroll position jumps
+```
+
+Better:
+
+```text
+if user near top:
+    prepend immediately
+else:
+    keep current viewport stable
+    increment "23 new events" banner
+```
+
+Pseudo-code:
+
+```ts
+if (isNearTop()) {
+  exposeNewEvents();
+} else {
+  pendingVisibleCount += newEvents.length;
+}
+```
+
+---
+
+# 17. Pause / Resume Live Mode
+
+```text
+LIVE
+events continuously visible
+```
+
+User clicks pause:
+
+```text
+PAUSED
+network stream remains connected
+events continue buffering
+UI snapshot is frozen
+```
+
+Why keep connection open?
+
+Avoid reconnect overhead and missing events.
+
+On resume:
+
+```text
+batch pending events
+update store
+restore live mode
+```
+
+---
+
+# 18. Search and Filtering
+
+Client-side is fine for currently loaded rows.
+
+Server-side is required for large history.
+
+Example:
+
+```http
+GET /activity?type=webhook.failed&created_after=...&cursor=...
+```
+
+Debounce text search and abort obsolete requests.
+
+---
+
+# 19. Live Updates + Filters
+
+Suppose user filters:
+
+```text
+type = webhook.failed
+```
+
+Incoming:
+
+```text
+payment.succeeded
+webhook.delivered
+webhook.failed
+```
+
+Do not rerun expensive filters over the entire dataset each time.
+
+Incrementally evaluate each new event:
+
+```ts
+if (matchesCurrentFilter(event)) {
+  visibleEventIds.prepend(event.eventId);
+}
+```
+
+---
+
+# 20. React Scheduling
+
+Large batches should not block high-priority input.
+
+Possible tool:
+
+```ts
+startTransition(() => {
+  exposeNewBatch(batch);
+});
+```
+
+But React scheduling is not the primary solution.
+
+The bigger wins are:
+
+- batching
+- bounded data
+- selectors
+- virtualization
+
+---
+
+# 21. Web Worker
+
+Move CPU-heavy event processing off main thread if profiling justifies it.
+
+Candidates:
+
+- large JSON transforms
+- expensive filtering
+- aggregation
+- sorting thousands of events
+- log parsing
+
+Architecture:
+
+```text
+SSE
+ |
+ v
+Worker
+ |
+ +-- parse
+ +-- validate
+ +-- dedupe
+ +-- coalesce
+ |
+ v
+batched messages
+ |
+ v
+Main thread store
+ |
+ v
+React
+```
+
+Tradeoff:
+
+- serialization cost
+- extra architecture complexity
+- debugging overhead
+
+---
+
+# 22. Memory Management
+
+A live stream can grow forever.
+
+Need explicit retention.
+
+Example:
+
+```text
+Keep:
+latest 5,000 event summaries in memory
+latest 500 rendered/searchable locally
+
+Older history:
+server pagination
+```
+
+Evict oldest data, but protect:
+
+- selected row
+- open drawer entity
+- pinned records
+
+---
+
+# 23. Reconnect Strategy
+
+Connection states:
+
+```text
+connecting
+connected
+reconnecting
+offline
+```
+
+Reconnect with exponential backoff and jitter:
+
+```text
+1s
+2s
+4s
+8s
+...
+max 30s
+```
+
+After long disconnect:
+
+```text
+stream resume attempt
+      |
+      +-- checkpoint valid -> replay gap
+      |
+      +-- checkpoint expired -> fresh snapshot
+```
+
+---
+
+# 24. Offline / Stale State
+
+If connection drops, keep existing content visible.
+
+Show:
+
+```text
+Live updates interrupted
+Last updated 17 seconds ago
+Reconnecting...
+```
+
+Important:
+
+```text
+network unavailable != no data
+```
+
+---
+
+# 25. Multi-Tab Strategy
+
+Simple MVP:
+
+```text
+Tab A -> SSE
+Tab B -> SSE
+Tab C -> SSE
+```
+
+Optimization:
+
+```text
+Leader tab
+   |
+   v
+SSE
+   |
+   v
+BroadcastChannel
+  / | \
+ A  B  C
+```
+
+Leader election reduces connections but increases complexity.
+
+For MVP, independent streams plus BroadcastChannel invalidations are reasonable.
+
+---
+
+# 26. Webhook Monitor Special Case
+
+```ts
+type WebhookAttempt = {
+  id: string;
+  endpointId: string;
+  eventType: string;
+  responseCode: number | null;
+  attemptNumber: number;
+  latencyMs: number | null;
+  status: 'pending' | 'succeeded' | 'failed';
+  createdAt: number;
+};
+```
+
+Useful columns:
+
+```text
+timestamp
+event
+endpoint
+status
+HTTP code
+latency
+attempt
+```
+
+---
+
+# 27. Alert Prioritization
+
+Not every incoming event deserves equal rendering priority.
+
+```text
+P0 critical merchant-impacting alert
+P1 failed payment / failed webhook
+P2 normal payment transition
+P3 informational telemetry
+```
+
+During overload:
+
+```text
+preserve P0/P1
+coalesce P2
+defer or sample P3
+```
+
+This is a strong Staff-level backpressure discussion.
+
+---
+
+# 28. Accessibility
+
+Do not announce every live event to screen readers.
+
+Avoid:
+
+```html
+aria-live="assertive"
+```
+
+on the whole feed.
+
+Prefer:
+
+- announce only critical alerts
+- polite new-event count
+- pause functionality
+- keyboard-accessible rows
+- stable focus
+- proper table/list semantics
+
+Example announcement:
+
+```text
+12 new events available
+```
+
+---
+
+# 29. Performance Budget
+
+Define measurable budgets.
+
+```text
+INP < 200 ms target
+network -> visible update < 250 ms typical
+batch commit < 8 ms main-thread target
+DOM nodes < 500 for monitor area
+memory bounded by retention policy
+```
+
+A Staff engineer should define what “no UI jank” means.
+
+---
+
+# 30. Observability
+
+## Transport
+
+```text
+stream_connect_latency
+stream_disconnect_count
+reconnect_count
+sequence_gap_count
+events_received/sec
+```
+
+## Processing
+
+```text
+queue_depth
+batch_size
+batch_processing_ms
+events_deduped
+events_coalesced
+events_dropped
+```
+
+## Rendering
+
+```text
+commit_duration
+long_tasks
+INP
+dropped_frames
+virtualized_row_count
+```
+
+## Product
+
+```text
+alert_open_rate
+time_to_inspect_event
+search_success
+refund_alert_acknowledged
+```
+
+---
+
+# 31. Failure Scenarios
+
+## Event burst
+
+```text
+2,000 events/sec
+```
+
+Response:
+
+- queue
+- batch
+- coalesce
+- prioritize
+- bounded memory
+
+## Duplicate replay after reconnect
+
+Use:
+
+```text
+eventId dedupe
+entity version
+```
+
+## Out-of-order event
+
+Ignore stale version or reconcile.
+
+## Slow client
+
+Reduce visible update frequency and coalesce.
+
+## Stream disconnected
+
+Show stale state, reconnect, resume from checkpoint.
+
+## Huge historical result
+
+Server pagination + virtualization.
+
+## User reading row while update arrives
+
+Preserve focus and scroll anchor.
+
+---
+
+# 32. Data Flow Walkthrough
+
+```text
+Backend
+ |
+ | payment.updated
+ v
+SSE connection
+ |
+ v
+Transport parser
+ |
+ v
+pending queue
+ |
+ v
+50 ms batch
+ |
+ v
+dedupe + version check
+ |
+ +----> eventsById[eventId]
+ |
+ +----> paymentsById[paymentId]
+ |
+ v
+store publishes narrow subscriptions
+ |
+ v
+PaymentStatusBadge(paymentId)
+ |
+ v
+only affected row rerenders
+```
+
+This is one of the most important flows to explain in the interview.
+
+---
+
+# 33. Recommended Client Modules
+
+```text
+src/
+  transport/
+    ActivityStream.ts
+    reconnect.ts
+
+  store/
+    activityStore.ts
+    entityStore.ts
+    selectors.ts
+
+  ingestion/
+    EventBuffer.ts
+    dedupe.ts
+    coalesce.ts
+
+  components/
+    LiveMonitor/
+    EventRow/
+    ConnectionStatus/
+    NewEventsBanner/
+
+  hooks/
+    useActivityStream.ts
+    useEvent.ts
+    usePayment.ts
+
+  workers/
+    activity.worker.ts
+```
+
+---
+
+# 34. Staff-Level Platform Discussion
+
+If multiple teams need live operational views, don't make each team reinvent:
+
+```text
+SSE reconnect
+buffering
+dedupe
+virtualization
+new event banner
+scroll anchoring
+connection status
+```
+
+Provide shared infrastructure:
+
+```ts
+createLiveResource({
+  snapshot,
+  subscribe,
+  getId,
+  getVersion,
+  retention,
+});
+```
+
+And reusable primitives:
+
+```tsx
+<LiveDataProvider />
+<ConnectionStatus />
+<VirtualizedFeed />
+<NewItemsBanner />
+<PauseLiveUpdates />
+```
+
+Domain teams define:
+
+```text
+schema
+row renderer
+filters
+detail panel
+```
+
+Platform owns:
+
+```text
+transport
+reconnect
+batching
+metrics
+memory policy
+```
+
+---
+
+# 35. Important Tradeoffs
+
+| Decision       | Option A       | Option B            | Discussion                           |
+| -------------- | -------------- | ------------------- | ------------------------------------ |
+| Live transport | SSE            | WebSocket           | SSE simpler for one-way feed         |
+| Rendering      | immediate      | batched             | batching protects main thread        |
+| Data shape     | giant array    | normalized store    | normalized reduces fan-out           |
+| History        | in-memory      | server paginated    | server pagination bounds memory      |
+| Updates        | every event    | coalesced           | preserve audit log separately        |
+| Processing     | main thread    | Worker              | Worker only when profiling justifies |
+| Multi-tab      | one stream/tab | leader tab          | complexity vs connection savings     |
+| Filtering      | recompute all  | incremental         | incremental scales better            |
+| Overload       | preserve all   | prioritize/coalesce | UI must stay usable                  |
+
+---
+
+# 36. Interview Summary
+
+> I would separate initial history from live transport, use REST for snapshots and SSE for the live stream, and establish a checkpoint so the handoff is lossless. Incoming events would never directly update React. They enter a bounded ingestion queue, where I dedupe, validate versions, coalesce entity updates, and commit batches every ~50-100 ms. The UI reads from a normalized external store with row-level selectors, and the feed is virtualized so only visible rows exist in the DOM. If the user scrolls away from the top, I preserve their viewport and accumulate a "new events" count rather than forcing inserts. Under burst load, correctness is preserved through authoritative server state while intermediate UI states are coalesced or deprioritized. I would also design explicit reconnect, sequence-gap recovery, bounded memory, accessibility, and observability into the platform so the same primitives can support payments, webhook logs, refunds, and disputes across multiple teams.
