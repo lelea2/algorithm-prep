@@ -100,6 +100,10 @@
       "hash": "d12b8842b244c6e58d824de3c02756fa2e79afa44dabb9c3ddacff428dbc7fba",
       "docRelative": "theme-design.png"
     },
+    "frontend-system-design/tooltip.png": {
+      "hash": "428f5fb9917129efd04640447dd59d5c134c8c57b001a7e2efd976968f1ee5f8",
+      "docRelative": "tooltip.png"
+    },
     "frontend-system-design/travel-booking.png": {
       "hash": "3cbb01f8565feb88ea98b2a0c1d3fcb6fc58a609d86432fb4e2b5ef64a6d62b7",
       "docRelative": "travel-booking.png"
@@ -255,6 +259,10 @@
     "frontend-system-design/theme-design.mdx": {
       "hash": "b410e67562548b41f34ad2076c9a5cf6ff820cb54a853b941a7dec10f2ec4254",
       "docRelative": "theme-design.mdx"
+    },
+    "frontend-system-design/tooltip.mdx": {
+      "hash": "4ada0b39ae8666559d43507161495a062b16a8687c95ac032ff9bcc4e603b756",
+      "docRelative": "tooltip.mdx"
     },
     "frontend-system-design/travel-booking.mdx": {
       "hash": "a5bfbd036ba272e27acbd8afe90646ce35abff738ccf916f8f76dbe934fb38d3",
