@@ -1,0 +1,269 @@
+---
+title: 'Circuit Breaker Pattern'
+description: 'How the circuit breaker pattern prevents cascading failures in microservices, a working code example, and staff-engineer interview questions with expected answers.'
+---
+
+# Circuit Breaker Pattern in Microservice Design
+
+## 1. Core Mental Model
+
+A circuit breaker wraps a call to a remote dependency (another service, a database, a third-party API) and stops making that call once the dependency looks unhealthy — the same way an electrical circuit breaker trips to stop current flow before it burns down the house.
+
+Use it to answer questions like:
+
+```text
+Should I keep calling a service that is timing out?
+How do I stop one slow dependency from exhausting my thread pool / connection pool?
+How do I fail fast instead of piling up latency?
+How do I let a recovering service breathe instead of getting hammered the instant it comes back?
+```
+
+The most important interview rule:
+
+> A circuit breaker protects the **caller** from a failing **callee**. It is a client-side resilience pattern, not a server-side one.
+
+Without it, a single slow downstream dependency causes:
+
+```text
+Slow dependency
+      │
+      ▼
+Callers' threads/connections pile up waiting
+      │
+      ▼
+Caller's own resource pool exhausts
+      │
+      ▼
+Caller becomes slow/unavailable too
+      │
+      ▼
+Cascading failure up the call graph
+```
+
+---
+
+## 2. The Three States
+
+```text
+        failures >= threshold
+   ┌───────────────────────────────┐
+   │                               ▼
+┌────────┐                    ┌────────┐
+│ CLOSED │                    │  OPEN  │
+└────────┘                    └────────┘
+   ▲                               │
+   │                               │ resetTimeout elapses
+   │ trial call succeeds           ▼
+   │                          ┌────────────┐
+   └──────────────────────────│ HALF-OPEN  │
+        trial call fails      └────────────┘
+                (back to OPEN)
+```
+
+- **Closed** — normal operation. Requests pass through. Failures are counted in a rolling window.
+- **Open** — the breaker has tripped. Requests fail immediately (fast-fail) without calling the dependency at all, for `resetTimeout` ms.
+- **Half-Open** — after the timeout, a limited number of "trial" requests are let through. If they succeed, the breaker closes; if they fail, it reopens.
+
+Key parameters you should always be able to name in an interview:
+
+| Parameter | Meaning |
+|---|---|
+| `failureThreshold` | Number/percentage of failures in a window before tripping to Open |
+| `rollingWindow` | Time window (or request count) over which failures are counted |
+| `resetTimeout` | How long to stay Open before trying Half-Open |
+| `halfOpenTrialCount` | How many trial requests are allowed through in Half-Open |
+| `timeout` | Per-request timeout that itself counts as a failure |
+| `fallback` | What to return when the breaker is Open (cache, default, degraded response) |
+
+---
+
+## 3. Code Example (Node.js)
+
+A minimal, dependency-free implementation to show the mechanics — in a real system you'd reach for a library (`opossum` in Node, `resilience4j` in Java, `Polly` in .NET) rather than hand-rolling this, but interviewers want to see you understand what's underneath.
+
+```javascript
+const STATE = {
+  CLOSED: 'CLOSED',
+  OPEN: 'OPEN',
+  HALF_OPEN: 'HALF_OPEN',
+};
+
+class CircuitBreaker {
+  constructor(action, options = {}) {
+    this.action = action; // async fn that performs the risky call
+    this.failureThreshold = options.failureThreshold ?? 5;
+    this.resetTimeout = options.resetTimeout ?? 10_000; // ms to stay OPEN
+    this.callTimeout = options.callTimeout ?? 3_000; // per-call timeout
+    this.halfOpenTrialCount = options.halfOpenTrialCount ?? 1;
+
+    this.state = STATE.CLOSED;
+    this.failureCount = 0;
+    this.nextAttempt = Date.now();
+    this.halfOpenInFlight = 0;
+  }
+
+  async fire(...args) {
+    if (this.state === STATE.OPEN) {
+      if (Date.now() < this.nextAttempt) {
+        throw new Error('CircuitBreakerOpenError: fast-failing, dependency is unhealthy');
+      }
+      this.state = STATE.HALF_OPEN;
+      this.halfOpenInFlight = 0;
+    }
+
+    if (this.state === STATE.HALF_OPEN && this.halfOpenInFlight >= this.halfOpenTrialCount) {
+      throw new Error('CircuitBreakerOpenError: half-open trial already in flight');
+    }
+
+    if (this.state === STATE.HALF_OPEN) this.halfOpenInFlight++;
+
+    try {
+      const result = await this._withTimeout(this.action(...args));
+      this._onSuccess();
+      return result;
+    } catch (err) {
+      this._onFailure();
+      throw err;
+    }
+  }
+
+  _withTimeout(promise) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('CallTimeoutError')), this.callTimeout)
+      ),
+    ]);
+  }
+
+  _onSuccess() {
+    if (this.state === STATE.HALF_OPEN) {
+      // trial call worked -> fully close the breaker
+      this.state = STATE.CLOSED;
+    }
+    this.failureCount = 0;
+  }
+
+  _onFailure() {
+    this.failureCount++;
+
+    if (this.state === STATE.HALF_OPEN) {
+      // trial call failed -> back to OPEN, wait again
+      this._trip();
+      return;
+    }
+
+    if (this.state === STATE.CLOSED && this.failureCount >= this.failureThreshold) {
+      this._trip();
+    }
+  }
+
+  _trip() {
+    this.state = STATE.OPEN;
+    this.nextAttempt = Date.now() + this.resetTimeout;
+    this.failureCount = 0;
+  }
+}
+
+// --- usage ---
+async function callPaymentsService(orderId) {
+  const res = await fetch(`https://payments.internal/orders/${orderId}`);
+  if (!res.ok) throw new Error(`Payments service ${res.status}`);
+  return res.json();
+}
+
+const paymentsBreaker = new CircuitBreaker(callPaymentsService, {
+  failureThreshold: 5,
+  resetTimeout: 10_000,
+  callTimeout: 2_000,
+});
+
+async function chargeOrder(orderId) {
+  try {
+    return await paymentsBreaker.fire(orderId);
+  } catch (err) {
+    // fallback: degrade gracefully instead of propagating the failure
+    return { status: 'queued_for_retry', orderId };
+  }
+}
+```
+
+Notes an interviewer will probe:
+
+- The breaker's state is **per-dependency, per-instance** unless you externalize it (e.g., shared Redis counter) — in a fleet of 50 pods, each pod trips independently, which is usually fine and even desirable (staggered recovery).
+- `callTimeout` matters as much as `failureThreshold` — a hung call that never resolves is worse than one that fails fast, because it ties up the caller's concurrency budget.
+- The `fallback` in `chargeOrder` is the actual resilience payoff. A circuit breaker without a sane fallback just turns "slow failure" into "fast failure" — better, but still a failure. Pair it with a cache, a default, a queue for later retry, or a degraded response.
+
+---
+
+## 4. When To Use It (and When Not To)
+
+**Use a circuit breaker when:**
+
+- Calling a downstream service/DB/third-party API over the network, where failures can be slow (timeouts) rather than instant (connection refused).
+- The caller has a finite resource pool (threads, DB connections, event-loop concurrency) that a hung dependency can exhaust.
+- You have a meaningful fallback (cache, default value, degraded UX, async retry) — otherwise you're just changing the failure mode, not improving the outcome.
+- The dependency is failure-correlated in bursts (deploys, GC pauses, regional outages) rather than uniformly random — breakers shine at protecting against *sustained* unhealthiness.
+
+**Don't bother (or combine with something else) when:**
+
+- The call is to an in-process function or something with no network/resource cost — there's nothing to protect against.
+- Failures are already rare/independent and cheap — retries with backoff and jitter may be enough on their own.
+- The operation is a write that can't be safely fast-failed without a fallback (e.g., "place order") — you need idempotency + queueing, and the breaker is only one piece of that story.
+- You need it for a *single* one-off call with no retry loop — breakers pay off across many calls where you're tracking a rolling failure rate.
+
+**Circuit breaker vs. related patterns** (staff interviews love this distinction):
+
+| Pattern | Purpose |
+|---|---|
+| Retry (with backoff/jitter) | Handle transient, independent failures |
+| Circuit breaker | Stop calling a dependency that's *sustained* unhealthy |
+| Bulkhead | Isolate resource pools so one dependency's failure can't starve others |
+| Rate limiter | Protect a dependency from *too much* traffic (inverse direction) |
+| Timeout | Bound how long you wait for any single call |
+
+They compose: timeout bounds each call, retry handles blips, circuit breaker stops retrying a truly-down dependency, bulkhead contains the blast radius, rate limiter protects the callee. A mature resilience layer (e.g., `resilience4j`, `Polly`, service mesh retry/outlier-detection policies in Envoy/Istio) usually gives you all five.
+
+---
+
+## 5. Staff Engineer Interview Questions
+
+### 1. Why not just use retries instead of a circuit breaker?
+
+**Expected answer:** Retries help with transient, independent failures (a single dropped packet, momentary GC pause). If the dependency is actually down or degraded, retries multiply load on an already-struggling service and add latency to every caller instead of failing fast. A circuit breaker recognizes *sustained* failure and stops the pile-on. In practice you use both: retry a couple of times with backoff+jitter inside the Closed state, and let the breaker trip if the failure rate stays high across many calls.
+
+### 2. Where does the circuit breaker's state live in a multi-instance deployment, and does that matter?
+
+**Expected answer:** By default state is in-process/per-instance — each pod/process has its own Closed/Open/Half-Open state and failure counters. That's usually fine: it means recovery is naturally staggered (not every instance hammers the recovering dependency at the exact same millisecond), which is actually a feature. The downside is inconsistent behavior across instances and slower fleet-wide reaction to an outage. Some systems centralize state (shared cache/Redis) when they want the whole fleet to trip in lockstep, at the cost of the breaker becoming a shared dependency itself — which is ironic, since you don't want your resilience mechanism to be a new single point of failure.
+
+### 3. Your circuit breaker just tripped to Open in production. Walk me through what you'd check.
+
+**Expected answer:** First, is this real (the dependency is actually unhealthy — check its own dashboards/error rates/latency) or a false trip (bad `failureThreshold`/`callTimeout` tuning, or a network blip local to this caller)? Check: error rate and p99 latency of the dependency, whether the breaker's fallback is actually engaging correctly (degraded response vs. silently swallowing errors), whether downstream retries from *other* callers are amplifying the load, and whether the trip is fleet-wide or isolated to a subset of instances (which would point to a partial network partition rather than a truly down dependency).
+
+### 4. How do you choose `failureThreshold` and `resetTimeout`? What happens if you get them wrong?
+
+**Expected answer:** Base them on the dependency's normal error rate and recovery time under load, not arbitrary defaults. Too-low threshold or too-short window: false trips on normal noise, degrading availability for no reason. Too-high threshold: you keep hammering a dead dependency far longer than necessary, letting cascading failure build up. `resetTimeout` too short: you re-open the wound by sending trial traffic into a service still recovering (thundering herd on recovery — mitigate with jittered/staggered half-open trials). Too long: you recover slower than you need to once the dependency is actually healthy. This should be tuned from historical incident data and validated with chaos/game-day testing, not guessed once and left alone.
+
+### 5. What's the difference between the circuit breaker's fallback and just returning an error?
+
+**Expected answer:** A fallback is what makes the pattern actually valuable to the end user — cached last-known-good data, a default/neutral value, a degraded UI path, or queueing the request for async retry. A breaker with no real fallback just converts a slow failure into a fast failure, which helps the caller's own resource exhaustion problem but does nothing for the end user's experience. Staff-level answer: design the fallback *first*, driven by product/UX requirements ("what should the user see if payments is down for 30 seconds?"), then wire the breaker to it — not the other way around.
+
+### 6. How would you circuit-break a write operation (e.g., "place order") where you can't just skip the call?
+
+**Expected answer:** You generally don't fast-fail a write with no side effect story — you need idempotency keys, a durable queue, and eventual delivery. The circuit breaker's role shifts: instead of "skip the call," it becomes "stop synchronous attempts and push to an async retry queue (outbox pattern / message broker) once the dependency looks unhealthy," then reconcile when it's healthy again. This is where breaker + queue + idempotency have to be designed together — a breaker alone is insufficient for writes.
+
+### 7. How does a circuit breaker interact with a service mesh (Envoy/Istio) versus an in-application library?
+
+**Expected answer:** A mesh can implement outlier detection/circuit breaking at the infrastructure layer (per-upstream-host ejection based on consecutive 5xxs), which is language-agnostic and centrally configurable, but it's coarser — it doesn't know your fallback semantics or business logic. In-app libraries (resilience4j, opossum, Polly) let you attach a meaningful fallback and act per-call-site, but require per-service implementation and consistency discipline across teams. A staff-level answer recognizes these solve overlapping but distinct problems and can be layered: mesh-level ejection protects the network/infra layer broadly, app-level breakers protect specific call sites with domain-aware fallbacks.
+
+### 8. Tell me about a time you'd explicitly choose *not* to add a circuit breaker somewhere.
+
+**Expected answer (shape, not literal):** A good answer identifies a case where the dependency was in-process, or failures were already independent/rare (so retry+timeout sufficed), or the added state/complexity wasn't worth it for a low-traffic, non-critical path. The staff-level signal here is knowing that every resilience pattern has an operational cost (more state to reason about, more failure modes of its own, more tuning surface) and applying it where the blast-radius math justifies it — not reflexively wrapping every network call in a breaker.
+
+### 9. How do you test that a circuit breaker actually works before you need it in a real incident?
+
+**Expected answer:** Chaos/game-day testing — inject latency or errors into the dependency in a staging (or carefully scoped production) environment and verify: the breaker trips at the expected threshold, fallback engages correctly, half-open trial behavior doesn't thunder-herd the recovering dependency, and metrics/alerts fire so on-call knows the breaker is open. Also unit/integration test the state machine itself (Closed→Open on threshold, Open→Half-Open on timeout, Half-Open→Closed on success, Half-Open→Open on failure) since that logic is easy to get subtly wrong (e.g., not resetting counters, race conditions on concurrent half-open trials).
+
+### 10. How would you monitor a circuit breaker in production — what metrics/alerts matter?
+
+**Expected answer:** Per-breaker state transitions (emit an event/metric on every Closed→Open, Open→Half-Open, Half-Open→Closed/Open), current state as a gauge, failure rate feeding the threshold, time spent in Open (a proxy for dependency downtime), and fallback invocation rate/success. Alert on: a breaker stuck Open beyond some duration (dependency isn't recovering, or `resetTimeout` misconfigured), a breaker flapping between Open/Half-Open repeatedly (unstable dependency or too-aggressive threshold), and fallback rate spiking (even if the breaker itself isn't a page-worthy event, degraded UX for users is).

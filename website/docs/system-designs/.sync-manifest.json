@@ -416,6 +416,10 @@
       "hash": "87234c7a382fac472290a68d4b16e6a3f09a26a75d6a876253dbf043d8630276",
       "docRelative": "job-scheduler.mdx"
     },
+    "system-designs/key-technologies/circuit-breaker.mdx": {
+      "hash": "897313595b699226a84b6a5d193c859b7df04344f5d839c3ba052f451b04dae5",
+      "docRelative": "key-technologies/circuit-breaker.mdx"
+    },
     "system-designs/key-technologies/database.mdx": {
       "hash": "1a6abe7901ffed4f147fecfda03b30e4bc6fdb4f7b381ebf42557befe7139b28",
       "docRelative": "key-technologies/database.mdx"
@@ -621,7 +625,7 @@
       "docRelative": "agentic-system-design/_index.mdx"
     },
     "__nav__:key-technologies": {
-      "hash": "7dc419ccea91a71efa281eb93d14d2ae6df3187c6f717c36ac8871a5add9d9fa",
+      "hash": "c29d6645f0d14cdca863fac561fc8571ccc42fa77bea1a1384e1c5cd170a0f26",
       "docRelative": "key-technologies/_index.mdx"
     },
     "__nav__:miscellaneous": {
