@@ -176,6 +176,10 @@
       "hash": "11accc02673b562dd0f4a631816ba77ec7f3a38749edfc3df74e7066c0aaf36c",
       "docRelative": "core/llm-text-vs-image.mdx"
     },
+    "frontend-system-design/core/module-federation.mdx": {
+      "hash": "73cb5bfcbb8d06282b4e9322b75ada9d80478459701512a193fcfbe5828a7625",
+      "docRelative": "core/module-federation.mdx"
+    },
     "frontend-system-design/core/react-performance.mdx": {
       "hash": "25cc7a0bbbd0c09c4d8cf7c70e97e6fbb9e37d13cd89e0c27bd14c7c1a05c95f",
       "docRelative": "core/react-performance.mdx"
@@ -273,7 +277,7 @@
       "docRelative": "video-netflix.mdx"
     },
     "__nav__:core": {
-      "hash": "3e4e70025e2320966a442652f5c62ed53273850d655c8de3f27ca1047f4ae7a9",
+      "hash": "e603cdb5d93b4a79b94ce18ee52a4d81e3c2b40e4f9f5dae15ba2551b6ce41ae",
       "docRelative": "core/_index.mdx"
     }
   }

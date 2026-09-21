@@ -1,0 +1,212 @@
+---
+title: 'Micro-Frontends with Module Federation'
+description: 'How to reason about micro-frontend architecture and Webpack/Rspack Module Federation as a staff engineer, with working config examples and interview framing.'
+---
+
+# Micro-Frontends & Module Federation — Staff Engineer Guide
+
+## Interview framing
+
+```txt
+1. What organizational problem does this solve? (Conway's Law, team autonomy)
+2. What does it cost? (shared dependency management, runtime coupling, debugging complexity)
+3. Would you actually recommend it for THIS team/product, or is it overkill?
+4. How do you keep independently-deployed pieces from breaking each other at runtime?
+```
+
+The strongest answers start with the organizational driver, not the technology:
+
+> "Module Federation is a _solution to a team-topology problem_ — many teams shipping to one product on independent timelines. If there's one team and one deploy cadence, I would not reach for it; a monolith with good code-splitting solves the same technical problem with far less operational cost."
+
+---
+
+# 1. The Core Problem It Solves
+
+```txt
+Monolithic SPA                    Micro-frontend (Module Federation)
+───────────────                    ─────────────────────────────────
+One build                          Independent builds per team
+One deploy pipeline                Independent deploy pipelines
+One team can block all others      Teams ship on their own cadence
+Shared bundle grows unbounded      Each remote loaded on demand
+Single point of build failure      A broken remote degrades, not blocks
+```
+
+Module Federation (native to Webpack 5, also supported by Rspack/Vite plugins) lets a JavaScript application dynamically load code from a **separately built and deployed** bundle at runtime, sharing dependencies (React, design system, etc.) instead of duplicating them.
+
+Two roles:
+
+- **Host** (a.k.a. shell/container) — the app the user loads first; it decides which remotes to pull in.
+- **Remote** — an independently built/deployed app that exposes modules the host can consume.
+
+A remote can itself be a host to other remotes — federation composes.
+
+---
+
+# 2. Code Example: Host + Remote Setup
+
+### Remote (`team-checkout`, exposes a component)
+
+```javascript
+// checkout-app/webpack.config.js
+const { ModuleFederationPlugin } = require('webpack').container;
+
+module.exports = {
+  mode: 'production',
+  devServer: { port: 3001 },
+  output: {
+    publicPath: 'https://checkout.mycdn.com/', // must be resolvable at runtime
+  },
+  plugins: [
+    new ModuleFederationPlugin({
+      name: 'checkout',
+      filename: 'remoteEntry.js',
+      exposes: {
+        './CheckoutWidget': './src/CheckoutWidget',
+      },
+      shared: {
+        react: { singleton: true, requiredVersion: '^18.0.0', eager: false },
+        'react-dom': { singleton: true, requiredVersion: '^18.0.0', eager: false },
+      },
+    }),
+  ],
+};
+```
+
+### Host (`shell`, consumes the remote)
+
+```javascript
+// shell-app/webpack.config.js
+const { ModuleFederationPlugin } = require('webpack').container;
+
+module.exports = {
+  mode: 'production',
+  plugins: [
+    new ModuleFederationPlugin({
+      name: 'shell',
+      remotes: {
+        // resolved at runtime against checkout's deployed remoteEntry.js
+        checkout: 'checkout@https://checkout.mycdn.com/remoteEntry.js',
+      },
+      shared: {
+        react: { singleton: true, requiredVersion: '^18.0.0' },
+        'react-dom': { singleton: true, requiredVersion: '^18.0.0' },
+      },
+    }),
+  ],
+};
+```
+
+### Loading the remote at runtime, with failure isolation
+
+```tsx
+// shell-app/src/RemoteCheckout.tsx
+import { lazy, Suspense } from 'react';
+import { ErrorBoundary } from './ErrorBoundary';
+
+// dynamic import — resolved via the federation runtime, not a static bundler dependency
+const CheckoutWidget = lazy(() => import('checkout/CheckoutWidget'));
+
+export function RemoteCheckout(props: { orderId: string }) {
+  return (
+    <ErrorBoundary fallback={<CheckoutFallback orderId={props.orderId} />}>
+      <Suspense fallback={<CheckoutSkeleton />}>
+        <CheckoutWidget {...props} />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+```
+
+### Resolving remotes dynamically instead of hardcoding URLs (common at staff level)
+
+Hardcoding `checkout@https://checkout.mycdn.com/remoteEntry.js` couples the host's build to the remote's exact URL. In practice, teams resolve remote entry URLs from a runtime manifest so remotes can be versioned/rolled back independently of the host's deploy:
+
+```javascript
+// dynamic remote registration, resolved from a manifest service at app boot
+async function loadRemoteEntry(manifestUrl, remoteName) {
+  const manifest = await fetch(manifestUrl).then((r) => r.json());
+  const remoteUrl = manifest[remoteName].entry; // e.g. served from a config/edge service
+
+  await __webpack_init_sharing__('default');
+  const container = await loadScript(remoteUrl).then(() => window[remoteName]);
+  await container.init(__webpack_share_scopes__.default);
+  return container;
+}
+```
+
+This is the piece interviewers most want to hear: **the set of remotes and their versions should be data, resolved at runtime, not baked into the host's build** — otherwise you've recreated a monolith's coupled-deploy problem with extra network hops.
+
+---
+
+# 3. Staff-Level Concerns (this is where the interview is actually won)
+
+### Shared dependency versioning
+
+`shared: \{ react: \{ singleton: true \} \}` means all federated apps agree to use _one_ copy of React at runtime. If a remote requires a React version incompatible with the host's, Webpack either warns and duplicates the dependency (bundle bloat, and risk of two React instances holding different Fiber trees — hooks break across the boundary) or errors, depending on `strictVersion`. A staff engineer owns a **cross-team dependency upgrade policy**: who upgrades React first, how remotes signal minimum-compatible versions, and what CI check prevents a remote from silently going out of the shared-version range.
+
+### Independent deploy ≠ independent contract
+
+Teams deploy independently, but the **exposed module's prop/API contract** is now a cross-team interface, same as any API contract. Treat `exposes` entries like a public API: version them, avoid breaking prop shape changes without coordination, and consider contract tests (e.g., a lightweight integration test in CI that boots the host against the remote's latest `remoteEntry.js` from a staging CDN) so a remote team can't silently break the host in production.
+
+### Runtime failure isolation
+
+A remote is fetched over the network at runtime — it can 404, time out, or throw during evaluation. This must **never** take down the host shell. Always wrap remote loads in an error boundary + fallback UI + timeout, and treat a failed remote load as a normal, monitored, expected failure mode (alerting on remote-load failure rate), not an exceptional crash.
+
+### Performance / network waterfall
+
+Federation adds a runtime fetch (`remoteEntry.js`) plus whatever chunks it lazily requests — this is an extra network round trip the monolith didn't have. Staff-level mitigations: preload critical remotes' `remoteEntry.js` via `<link rel="modulepreload">`/prefetch hints when you know a remote will be needed soon, put remoteEntry behind a CDN with long cache + content-hashed filenames, and measure whether the org's real bottleneck (bundle size vs. team velocity) actually justifies the added latency.
+
+### Debuggability
+
+Errors from federated code cross build boundaries — source maps, error monitoring (Sentry, etc.) need to correctly attribute a runtime error in a lazily-loaded remote back to that team's repo/release, not the shell's. Decide this **before** rollout, not after the first cross-team incident where nobody can tell whose deploy caused the regression.
+
+### When NOT to use it
+
+- Single team, single deploy cadence — you're paying the shared-dependency/runtime-coupling tax for no organizational benefit.
+- A design system / shared UI kit is usually better distributed as a **versioned npm package**, not a federated remote — federation is for independently-deployed _applications/features_, not for sharing a button component.
+- Small products where full-monolith rebuild+deploy is already fast (a few minutes) — the coordination overhead of federation isn't worth it until team count and deploy-cadence mismatch actually hurts.
+
+---
+
+# 4. How to Answer This as a Staff Engineer
+
+A strong structure for a live interview answer:
+
+1. **Lead with the org problem.** "This is a solution for multiple teams needing independent deploy cadence on one product surface." Don't open with Webpack config.
+2. **Name the trade-off explicitly.** Deploy independence and team autonomy, traded for shared-dependency governance, cross-team runtime contracts, and a harder debugging story.
+3. **Show you'd guard the failure modes**, not just the happy path: error boundaries around every remote, monitored remote-load failure rate, a shared-dependency version policy, and a CDN/versioning strategy that lets remotes roll back independently of the host.
+4. **Say when you'd say no.** Interviewers explicitly listen for engineers who reach for the trendy pattern regardless of fit versus ones who can justify _not_ using it for a single-team product.
+5. **Bring an example of the two hardest real bugs this pattern produces** — a React duplicate-instance bug from a shared-dependency version mismatch, and a remote silently deployed with a breaking prop-contract change — and how you'd prevent each with tooling (CI shared-version lint, contract tests) rather than tribal knowledge.
+
+---
+
+# 5. Staff Engineer Interview Questions
+
+### 1. What problem does Module Federation solve that code-splitting alone doesn't?
+
+**Expected answer:** Code-splitting (dynamic `import()`) solves bundle size within a single build/deploy. It doesn't let two separate teams deploy independently — every chunk still comes from the same build pipeline and release train. Module Federation adds _runtime_ composition of separately-built-and-deployed bundles, so team A can ship Tuesday and team B can ship Thursday without either blocking the other or even redeploying the shell.
+
+### 2. Two remotes both depend on React but at different minor versions. What actually happens, and how do you prevent it from becoming an incident?
+
+**Expected answer:** With `singleton: true` and a `requiredVersion` range, Webpack tries to satisfy all consumers from one shared instance if versions are semver-compatible; if not, depending on `strictVersion`, it either logs a runtime warning and loads a second copy of React (risk: hooks/context break across the boundary since two React instances don't share fiber state) or throws. Prevention is process, not code: a shared-dependency version policy enforced in CI (e.g., a lint step that fails a remote's build if its React version falls outside the org's agreed range), and a dashboard of which remotes are on which shared-dep versions so drift is visible before it causes a production bug.
+
+### 3. A remote's `remoteEntry.js` fails to load in production. What's your incident response, and what should have been built in advance?
+
+**Expected answer:** Immediate: the host should already degrade gracefully — error boundary shows a fallback UI, the rest of the shell keeps working, and this is an alerted, dashboarded failure mode, not a full outage. Root-causing: check whether it's a CDN/network issue, a bad deploy of the remote, or a version-manifest pointing at a URL that no longer exists. What should exist beforehand: monitoring on remote-load success rate per remote, a fast rollback path for the remote's manifest entry (point back at the last-known-good `remoteEntry.js` URL), and a runbook so any on-call engineer — not just the remote's own team — can execute that rollback.
+
+### 4. How do you keep a remote team from unknowingly breaking the host with a prop-contract change?
+
+**Expected answer:** Treat `exposes` modules as a versioned public API between teams, not an implementation detail. Practical mechanisms: TypeScript types for the exposed module's props published/shared between host and remote (a shared `@org/checkout-contract` types package, or generated from the remote's source), a contract/integration test in CI that mounts the host against the remote's actual latest build in staging, and a deprecation process for breaking changes (parallel old/new exposed versions during migration) rather than a hard cutover.
+
+### 5. When would you tell a team _not_ to adopt micro-frontends / Module Federation?
+
+**Expected answer:** Single team owning the whole surface with one deploy cadence — there's no organizational problem being solved, only added runtime complexity. Also: when the actual shared unit is a UI component library rather than an independently-releasable feature — that belongs in a versioned npm package. Also: early-stage products where team count is still small and monolith rebuild time is already fast — the coordination tax of federation (shared-version governance, cross-team contracts, harder debugging) isn't worth paying until the org actually has multiple teams whose deploy cadences are being blocked by each other.
+
+### 6. How does this affect performance, and how would you measure whether it's a net win?
+
+**Expected answer:** Federation adds at least one extra runtime network fetch (the remote's entry file, then its lazily-loaded chunks) compared to a single monolith bundle — this is a real latency cost, mitigated with CDN caching, content-hashed long-cache filenames, and preloading remotes you know will be needed. To decide if it's a net win, measure it against what it's bought: deploy frequency per team before/after, lead time from code-complete to production, and cross-team blocking incidents — not just raw page-load metrics, since the whole point of the pattern is organizational throughput, and a small latency regression can be worth it if deploy velocity multiplies across many teams.
+
+### 7. How do you debug a production error that only reproduces when a specific combination of remote versions are live together?
+
+**Expected answer:** This is the hardest class of bug federation introduces — errors that don't exist in either team's isolated staging environment because they only manifest from a specific _combination_ of independently-deployed versions. Staff-level mitigation is preventing this class rather than just debugging it after the fact: a staging/integration environment that always runs the _current production_ versions of every remote together (not each team's own latest-in-progress build), so cross-remote incompatibilities surface before prod, plus enough logging/monitoring (remote version tags attached to error reports) that when it does happen, you can immediately see which version combination was live at the time.
