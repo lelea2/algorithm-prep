@@ -1,5 +1,13 @@
 {
   "files": {
+    "company/hingehealth/hingehealth.png": {
+      "hash": "9b429c50be21ba5d4da74a14bb256531eeadd91a64bd2abc48431fae44e5b147",
+      "docRelative": "hingehealth/hingehealth.png"
+    },
+    "company/hingehealth/hingehealth_framework.png": {
+      "hash": "5090f153afd5a833475e7c23fcb712ea90f2dc2f938e4ea4e7b966c5c51b3c14",
+      "docRelative": "hingehealth/hingehealth_framework.png"
+    },
     "company/c3.ai/checkPackageDependencies.js": {
       "hash": "2e8db71010069cd60d30ba5ca4b20b2470cf369c1b1633562b0338f66c29a35b",
       "docRelative": "c3.ai/checkPackageDependencies.mdx"
@@ -13,7 +21,7 @@
       "docRelative": "cisco/README.mdx"
     },
     "company/cisco/RemoteModuleHost.tsx": {
-      "hash": "be07e8a1c1896cb504d8034232c743ffa93a4483a6d5f20a8f062a0dc1a6f5e1",
+      "hash": "d1d91d030ed2c281030d774b34d453f96e2b3c3110d1fa199d36b29b1e80ad04",
       "docRelative": "cisco/RemoteModuleHost.mdx"
     },
     "company/coursera/formatArticle.js": {
@@ -52,6 +60,10 @@
       "hash": "88c672810075142ae3152bd2537aaaee52928b1c3814d965677fc4376b2986f0",
       "docRelative": "harvey/SpreadSheetReact.mdx"
     },
+    "company/harvey/citationMatch.js": {
+      "hash": "234cb861c4583b80352807c16bb551d69d59bf64b50fb1d940e30fcd906a41b5",
+      "docRelative": "harvey/citationMatch.mdx"
+    },
     "company/harvey/retry.js": {
       "hash": "5069ba9a709d92f8eec846a0bbcffe784fcace600d2a17e41050f7c99cb04341",
       "docRelative": "harvey/retry.mdx"
@@ -59,6 +71,10 @@
     "company/harvey/wordCount.js": {
       "hash": "b76ec60ba70c9257e1023f23e2935dd1740a8982e9a762a0966cde8e6af9f7c5",
       "docRelative": "harvey/wordCount.mdx"
+    },
+    "company/hingehealth/hingehealth-interview-guide.mdx": {
+      "hash": "b8c27ced9f7b4199c2c0d0caa9d3413957fcb8490ba5d84368dee5faded89633",
+      "docRelative": "hingehealth/hingehealth-interview-guide.mdx"
     },
     "company/meta/htmlText.js": {
       "hash": "fbf3f4ccaec79a204020c4213f563d0baaac27cdd79725fcfcf63aefb5850232",
@@ -145,8 +161,12 @@
       "docRelative": "gusto/_index.mdx"
     },
     "__nav__:harvey": {
-      "hash": "4fa2ddd8934eed298847aad205220a6a4ca0498308dde438c1bcd99972f71bbe",
+      "hash": "6fb5914f24e965df3f432786b0983c64db649d9b29cd24102984ceb74d217353",
       "docRelative": "harvey/_index.mdx"
+    },
+    "__nav__:hingehealth": {
+      "hash": "9bd5fd5713045591401c43f38e6ea0c7c83949da9903b8899a8efc6aebbf1dce",
+      "docRelative": "hingehealth/_index.mdx"
     },
     "__nav__:meta": {
       "hash": "a166b72158fd6912f7eb91bbece9f0ceda391bfdf6250f0f1e2d597c321ea655",
