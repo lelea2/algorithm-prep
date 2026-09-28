@@ -21,11 +21,11 @@
       "docRelative": "chatapp.png"
     },
     "frontend-system-design/chatgpt.png": {
-      "hash": "685263d554fab17c9e9e1d39503082c48c6279d0f2c6ea3faafc12f5122de501",
+      "hash": "a82a20e1fbaed81e02578c9bcdd5b388d3c0e6db69c3b78c4b8afc7bd4502799",
       "docRelative": "chatgpt.png"
     },
     "frontend-system-design/client-cache.png": {
-      "hash": "2e1bd31fa38e3610a007d7a964ffa73c85671783f59678e0bee1e51cee34b4da",
+      "hash": "aa2f91e349c6bf424818dbc51a3558f63aefcca22af958c071868315186aded5",
       "docRelative": "client-cache.png"
     },
     "frontend-system-design/core/llm-text-vs-image.png": {
@@ -101,7 +101,7 @@
       "docRelative": "theme-design.png"
     },
     "frontend-system-design/tooltip.png": {
-      "hash": "428f5fb9917129efd04640447dd59d5c134c8c57b001a7e2efd976968f1ee5f8",
+      "hash": "08717b447b8d0b897dffccc9facda199652d40875ad66fc5c4d61b1dff4b4936",
       "docRelative": "tooltip.png"
     },
     "frontend-system-design/travel-booking.png": {
