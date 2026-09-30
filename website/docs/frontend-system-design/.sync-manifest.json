@@ -84,9 +84,9 @@
       "hash": "53425ba91fa4280c48a9b95c40e0e352e3b1a68bc32778dd7910fe3d3a088d94",
       "docRelative": "poll-widget.png"
     },
-    "frontend-system-design/resuable-datagrid.png": {
-      "hash": "b6a5ea715b899dc487434554f9f9b8e22dc10fa128776414e31dbc86a9dbe8a3",
-      "docRelative": "resuable-datagrid.png"
+    "frontend-system-design/reusable-datagrid.png": {
+      "hash": "a7d198a25cbaa6ecd7c52448fe70c955ce1052fb390e7fb2cd35b753366b3cdf",
+      "docRelative": "reusable-datagrid.png"
     },
     "frontend-system-design/richtexteditor.png": {
       "hash": "6e7e04b3b6287e92a8326ee167055be3abe436645d52aebf89941f1129526b1a",
@@ -249,7 +249,7 @@
       "docRelative": "poll-widget.mdx"
     },
     "frontend-system-design/reusable_datagrid_list_card_system.mdx": {
-      "hash": "1393c23eac80c61f8153f8c6ad00fc896dd0b725c64d50dccd2ad95036578fec",
+      "hash": "084556786fa18a8957d299aff2fbe8771eede8ca4f1f852348d29e37533ed009",
       "docRelative": "reusable_datagrid_list_card_system.mdx"
     },
     "frontend-system-design/rich-text-editor.mdx": {
