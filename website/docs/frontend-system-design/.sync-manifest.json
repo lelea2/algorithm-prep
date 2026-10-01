@@ -8,6 +8,10 @@
       "hash": "d989178b9ef619ce004e557fd5081352cc2349195b10aea60b833fce514432b8",
       "docRelative": "100k_node.svg"
     },
+    "frontend-system-design/album-carousel.png": {
+      "hash": "8542433afdd3b119d599165a46edf65a43cf4ea9e25727c7c212f9b19753b7cb",
+      "docRelative": "album-carousel.png"
+    },
     "frontend-system-design/autocomplete.png": {
       "hash": "26e25604a5869768345fc039354d2ca58d2d8083c9cb4f507dc018bd908e5ae9",
       "docRelative": "autocomplete.png"
@@ -119,6 +123,10 @@
     "frontend-system-design/100k_node.mdx": {
       "hash": "755110ecd17ad4af177e1c9145310902699e1db5d773a5a83176b2218d632dbc",
       "docRelative": "100k_node.mdx"
+    },
+    "frontend-system-design/album-carousel.mdx": {
+      "hash": "3f21ee637511db1c08979e5f840ad03fc6e8cb9d42d1b42701a1765a89b6a4cb",
+      "docRelative": "album-carousel.mdx"
     },
     "frontend-system-design/autocomplete.mdx": {
       "hash": "5706f698170b87bd9abca32ba0857b32e6bc48301d1a8b191be144aff80f2892",
