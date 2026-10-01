@@ -1308,6 +1308,10 @@
       "hash": "4707d0a5c215ab6eb6c8e866c67861acb9277be098aec95763f77c9cf4cd7a10",
       "docRelative": "frontend/react-interview/MapListingSync/MapListingSync.jsx.mdx"
     },
+    "frontend/react-interview/MemoryCard.js": {
+      "hash": "de862fcfc30509a7287ea774c169efacfd29bec12d620460295965e49d2bfae6",
+      "docRelative": "frontend/react-interview/MemoryCard.mdx"
+    },
     "frontend/react-interview/ModalSystem/ModalSystem.css": {
       "hash": "07dd8c61188e2f92a985fdda5288e2e94731aa5c611361ae22199a832423a2c9",
       "docRelative": "frontend/react-interview/ModalSystem/ModalSystem.css.mdx"
@@ -2549,7 +2553,7 @@
       "docRelative": "frontend/react-component-interview/hooks/_index.mdx"
     },
     "__nav__:frontend/react-interview": {
-      "hash": "eec984da39a69302779153e02a5dfa74d49eece1abde5925b60152462af96223",
+      "hash": "d6f83e5db41ac5276a33d183d5c81a713a095a363be1c64931b877312ba94a57",
       "docRelative": "frontend/react-interview/_index.mdx"
     },
     "__nav__:frontend/react-interview/Accordion": {

@@ -1,0 +1,228 @@
+import React, { useEffect, useState } from "react";
+import "./styles.css";
+
+type Card = {
+  id: string;
+  value: string;
+  state: "hidden" | "visible" | "matched";
+};
+
+const VALUES = ["🍎", "🍌", "🍇", "🍓", "🍒", "🥝"];
+
+function createDeck(): Card[] {
+  return [...VALUES, ...VALUES]
+    .map((value, index) => ({
+      id: `${value}-${index}`,
+      value,
+      state: "hidden" as const,
+    }))
+    .sort(() => Math.random() - 0.5);
+}
+
+export default function MemoryGame() {
+  const [cards, setCards] = useState<Card[]>(createDeck);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [moves, setMoves] = useState(0);
+
+  const handleCardClick = (id: string) => {
+    // Prevent a third click while comparing two cards.
+    if (selected.length === 2) return;
+
+    const clickedCard = cards.find((card) => card.id === id);
+
+    if (!clickedCard || clickedCard.state !== "hidden") {
+      return;
+    }
+
+    setCards((prev) =>
+      prev.map((card) =>
+        card.id === id
+          ? { ...card, state: "visible" }
+          : card
+      )
+    );
+
+    setSelected((prev) => [...prev, id]);
+  };
+
+  useEffect(() => {
+    if (selected.length !== 2) return;
+
+    const [firstId, secondId] = selected;
+
+    const first = cards.find((card) => card.id === firstId);
+    const second = cards.find((card) => card.id === secondId);
+
+    if (!first || !second) return;
+
+    setMoves((count) => count + 1);
+
+    if (first.value === second.value) {
+      setCards((prev) =>
+        prev.map((card) =>
+          card.id === firstId || card.id === secondId
+            ? { ...card, state: "matched" }
+            : card
+        )
+      );
+
+      setSelected([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setCards((prev) =>
+        prev.map((card) =>
+          card.id === firstId || card.id === secondId
+            ? { ...card, state: "hidden" }
+            : card
+        )
+      );
+
+      setSelected([]);
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [selected]);
+
+  const resetGame = () => {
+    setCards(createDeck());
+    setSelected([]);
+    setMoves(0);
+  };
+
+  const matchedCards = cards.filter(
+    (card) => card.state === "matched"
+  ).length;
+
+  const gameComplete = matchedCards === cards.length;
+
+  return (
+    <main className="game">
+      <div className="header">
+        <div>
+          <h1>Memory Game</h1>
+          <p>Moves: {moves}</p>
+        </div>
+
+        <button onClick={resetGame}>
+          Reset
+        </button>
+      </div>
+
+      {gameComplete && (
+        <p
+          className="success"
+          role="status"
+          aria-live="polite"
+        >
+          🎉 You won in {moves} moves!
+        </p>
+      )}
+
+      <div
+        className="grid"
+        aria-label="Memory card game"
+      >
+        {cards.map((card) => {
+          const revealed =
+            card.state === "visible" ||
+            card.state === "matched";
+
+          return (
+            <button
+              key={card.id}
+              className={`card ${
+                card.state === "matched"
+                  ? "matched"
+                  : ""
+              }`}
+              onClick={() => handleCardClick(card.id)}
+              disabled={
+                card.state === "matched" ||
+                selected.length === 2
+              }
+              aria-label={
+                revealed
+                  ? `Card ${card.value}`
+                  : "Hidden card"
+              }
+            >
+              {revealed ? card.value : "?"}
+            </button>
+          );
+        })}
+      </div>
+    </main>
+  );
+}
+/// CSS
+{/* <style>
+  * {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}
+
+.game {
+  width: min(600px, 100%);
+  margin: 40px auto;
+  padding: 20px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.header button {
+  padding: 10px 18px;
+  cursor: pointer;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.card {
+  aspect-ratio: 1;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+
+  font-size: 32px;
+  cursor: pointer;
+
+  background: #eee;
+}
+
+.card:hover:not(:disabled) {
+  background: #ddd;
+}
+
+.card:focus-visible {
+  outline: 3px solid #333;
+  outline-offset: 2px;
+}
+
+.card.matched {
+  opacity: 0.55;
+}
+
+.success {
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+</style> */}
