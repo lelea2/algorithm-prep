@@ -40,6 +40,10 @@
       "hash": "e4906ec1cd39b1526e4d0acdbebaf8eaa960640a16b8067d03ca480f67ac6db6",
       "docRelative": "design-calendar.png"
     },
+    "frontend-system-design/dropdown.png": {
+      "hash": "488ca9baa7a3f292cc0391dc77758401a532dbc38f9c9c137d633c87efa03bbe",
+      "docRelative": "dropdown.png"
+    },
     "frontend-system-design/figma.png": {
       "hash": "53090476ba1b540f21821051a3b4a5632d39a3ee5dac26eec2a660328856b83c",
       "docRelative": "figma.png"
@@ -207,6 +211,10 @@
     "frontend-system-design/design-calendar.mdx": {
       "hash": "0e38f9264ef90e3591d728405c803e0fe2f75700e82c8785cc9a88661644420d",
       "docRelative": "design-calendar.mdx"
+    },
+    "frontend-system-design/dropdown.mdx": {
+      "hash": "cdd305a45ab8d9667ce59216bc267866a3eef972c88c302cf6fc2e989f339101",
+      "docRelative": "dropdown.mdx"
     },
     "frontend-system-design/figma.mdx": {
       "hash": "873b505cb2d09b46b1a51725c636afa3e831d295f89287fdb809d7e3f66be744",
