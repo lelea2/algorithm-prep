@@ -320,6 +320,10 @@
       "hash": "a91d3d6f4cf75408c397ba3c423078d6bf442b8106fc97f13a54d0d339b7921d",
       "docRelative": "yelp.png"
     },
+    "system-designs/Vault_System_Design.mdx": {
+      "hash": "52296f83c7a56755937152fa853072fc79411436bc8cc19afb6de862a2ae43aa",
+      "docRelative": "Vault_System_Design.mdx"
+    },
     "system-designs/ad-click-aggregator.mdx": {
       "hash": "fc3a62df8558b648e6cf899feedfe505edac7fbc4cc2fa955f4e0a8b80a25395",
       "docRelative": "ad-click-aggregator.mdx"
