@@ -160,6 +160,10 @@
       "hash": "b8aea79be67efbc913a32ec8149ecd01d264f2878bf3118ef6a36192abf111b8",
       "docRelative": "core/XSS-vs-CORS.mdx"
     },
+    "frontend-system-design/core/angular_material_design_tokens_vs_react_staff_prep.mdx": {
+      "hash": "5cc2c5cc815c7d37f5053f947dba788e17de6225538c59957405dfb57d50ae18",
+      "docRelative": "core/angular_material_design_tokens_vs_react_staff_prep.mdx"
+    },
     "frontend-system-design/core/asset-optimize-stencil.mdx": {
       "hash": "031855ea24fa6405114444f1d572ce6c36cd4c633f362051e13860c4ba3697c3",
       "docRelative": "core/asset-optimize-stencil.mdx"
@@ -309,7 +313,7 @@
       "docRelative": "video-netflix.mdx"
     },
     "__nav__:core": {
-      "hash": "e603cdb5d93b4a79b94ce18ee52a4d81e3c2b40e4f9f5dae15ba2551b6ce41ae",
+      "hash": "7c4ce4800259deab3ca5f7e1e94f131cae5f01a43e08dfd5bdd7783ec4a3ba54",
       "docRelative": "core/_index.mdx"
     }
   }

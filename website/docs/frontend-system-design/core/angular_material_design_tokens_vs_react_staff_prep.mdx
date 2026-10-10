@@ -1,0 +1,701 @@
+---
+title: 'Angular Material, Design Tokens & React'
+description: 'A six-day Angular ramp-up and frontend architecture deep dive for a React-heavy Staff Engineer'
+date: '2026-10-10'
+---
+
+# Angular Material, Design Tokens & React
+
+> **Goal:** Be able to read and modify Angular code, build a Material-based UI, explain its reactive rendering model, and lead a staff-level architectural discussion about design systems, performance, accessibility, and incremental migration. You do **not** need to become an Angular specialist in one week.
+
+> **Version note (October 2026):** Angular APIs evolve quickly. Examples emphasize modern standalone components, signals, and built-in control flow. Legacy NgModules, `*ngIf`, `*ngFor`, RxJS-heavy stores, and older Material Sass theme APIs remain important to **recognize** in existing codebases. Confirm the target repository's Angular/Material major versions before applying example commands or migrations.
+
+# 0. FIRST: Everything to prioritize (ranked)
+
+| Priority | Topic                      | Exactly what to know                                                                                                                         | Proof you learned it                                | Estimated time |
+| -------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | -------------- |
+| **P0**   | Angular mental model       | framework vs React library; standalone components, decorator, template, DI                                                                   | explain Angular component + service in 2 min        | 1.5h           |
+| **P0**   | Template syntax            | `\{\{\}\}`, `[prop]`, `(event)`, `[(value)]`, `@if`, `@for (…; track …)`                                                                         | build searchable list                               | 1.5h           |
+| **P0**   | Signals and rendering      | `signal`, `computed`, `effect` (side effects only), signal template reads, change detection, `OnPush`, legacy zone-based apps                | trace a state update end-to-end                     | 2h             |
+| **P0**   | Angular Material vs tokens | Material components != Material Design != Angular != tokens; Sass-generated CSS variables; global/semantic/component tokens; theme/overrides | implement light/dark + dense table                  | 2h             |
+| **P0**   | Data flow and services     | `input()`, `output()`, `model()`, service injection, HTTP, loading/error/cancel; Observable vs Promise                                       | fetch + filter + detail view                        | 2h             |
+| **P0**   | Staff migration plan       | Angular→React strangler; preserve behaviors and routing; shared tokens; incremental rollout/rollback                                         | give a 5-min migration proposal                     | 2h             |
+| **P1**   | Material/CDK               | MatTable, Dialog, FormField, Select, Menu, Sidenav; CDK overlay and virtual scroll                                                           | construct dashboard shell                           | 2h             |
+| **P1**   | RxJS                       | `Observable`, `async`, `switchMap`, `debounceTime`, `distinctUntilChanged`, `takeUntilDestroyed`                                             | debounced cancellable search                        | 1.5h           |
+| **P1**   | Performance                | track identity, stable state, virtualize big lists, lazy routes, avoid expensive templates, profile real user timings                        | explain 10k-row strategy                            | 1.5h           |
+| **P1**   | A11y + security            | focus, keyboard, dialogs/overlays, tables, WCAG contrast, XSS sanitizer, auth                                                                | audit 3 interactions                                | 1.5h           |
+| **P1**   | Forms and testing          | Reactive Forms, validators, Testing Library/TestBed, harnesses                                                                               | validated filter form + test                        | 1.5h           |
+| **P2**   | Advanced                   | SSR/hydration, zoneless specifics, micro-frontends, signals↔RxJS bridges, CDK internals                                                      | articulate tradeoffs; no deep implementation needed | 1–2h           |
+
+**Spend ~70% coding/diagramming, ~30% reading.** If only **three days** remain: learn template + signals + Material theming + incremental migration; skim RxJS/CDK and practice staff-level answers. **Skip** compiler internals, custom structural directives, complex decorators, NgRx implementation, and wholesale rewrites.
+
+## The critical distinction in one sentence
+
+**Angular** is an opinionated frontend framework; **Angular Material** is its Material Design-based component library; **design tokens** are platform-independent named design decisions expressed as variables; **React** is a UI library that can use the same tokens with a different component library (or custom components).
+
+---
+
+# 1. Angular vs React: exact concept mapping
+
+| Concern       | React                                | Angular                                                                        | Staff-level implication                               |
+| ------------- | ------------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| UI unit       | function component JSX               | class decorated `@Component` + template                                        | different syntax; similar component boundaries        |
+| State         | `useState` / external store          | `signal()`, service/store                                                      | favor single source of truth                          |
+| Derived state | values / `useMemo`                   | `computed()`                                                                   | don't copy derived state into writable state          |
+| Side effects  | `useEffect`                          | `effect()` for non-reactive side effects; RxJS/HTTP service for data pipelines | prevent loops, stale requests, leaks                  |
+| Parent→child  | props                                | `input()` or legacy `@Input`                                                   | unidirectional by default                             |
+| Child→parent  | callback prop                        | `output()` or legacy `@Output`                                                 | event names describe intent                           |
+| Two-way data  | controlled input + callback          | `model()` / `[(value)]` or Forms                                               | use sparingly, especially across domain boundaries    |
+| Conditional   | `\{condition && <X/>\}`                | `@if (condition) \{ … \}`                                                        | readable branching                                    |
+| Lists         | `.map`, React `key`                  | `@for (...; track item.id)`                                                    | use stable domain ID, not index in mutable lists      |
+| Context / DI  | Context, providers                   | hierarchical DI, `inject()`                                                    | service scope changes data ownership                  |
+| Data fetch    | fetch / TanStack Query               | `HttpClient` Observable, reactive `httpResource` in compatible versions        | cancellation, caching, retry, stale updates           |
+| Styling       | CSS modules, CSS-in-JS, tokens       | component-scoped styles + global tokens/Sass                                   | theme vars often need global scope                    |
+| Router        | React Router / framework-specific    | Angular Router                                                                 | preserve deep links in migration                      |
+| Forms         | controlled inputs, React Hook Form   | Reactive Forms, validators                                                     | forms are a larger Angular ecosystem concept          |
+| UI components | MUI/Radix/custom                     | Angular Material + CDK                                                         | Material != only styling; includes a11y behavior      |
+| Testing       | RTL/Vitest/Jest                      | TestBed, component harnesses, browser E2E                                      | test behavior over framework internals                |
+| Rendering     | component re-render + reconciliation | binding/change detection + reactive signal notifications                       | benchmark rendered work, not slogan-level differences |
+
+### Mistakes React developers often make
+
+1. Calling signals “Angular's `useState`” without explaining reads via `count()` and notification of template consumers.
+2. Assuming Angular component logic is JSX. HTML templates use Angular's binding grammar.
+3. Treating `@for` tracking as optional: track stable IDs for mutable collections.
+4. Treating any `Observable` as “just a Promise”: Observables can emit many values and support cancellation/composition.
+5. Assuming Angular Material styling can safely be overridden through private DOM selectors. Prefer supported token/theme APIs.
+6. Calling the Material component library a design token system. Tokens are one layer; components supply DOM, keyboard behavior, overlays, etc.
+7. Assuming every Angular app has the newest defaults. Existing enterprise apps vary substantially by major version and migration stage.
+
+---
+
+# 2. React component translated into Angular
+
+## React: searchable list
+
+```tsx
+import { useMemo, useState } from 'react';
+
+type Asset = { id: string; name: string; status: 'online' | 'offline' };
+
+export function AssetList({
+  assets,
+  onSelect,
+}: {
+  assets: Asset[];
+  onSelect: (id: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const filtered = useMemo(
+    () => assets.filter((a) => a.name.toLowerCase().includes(query.toLowerCase())),
+    [assets, query]
+  );
+  return (
+    <section>
+      <label htmlFor="asset-search">Search assets</label>
+      <input id="asset-search" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <ul>
+        {filtered.map((a) => (
+          <li key={a.id}>
+            <button onClick={() => onSelect(a.id)}>
+              {a.name} — {a.status}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+```
+
+## Angular: same component, modern standalone syntax
+
+```ts
+import { Component, computed, input, output, signal } from '@angular/core';
+
+type Asset = { id: string; name: string; status: 'online' | 'offline' };
+
+@Component({
+  selector: 'app-asset-list',
+  standalone: true,
+  template: `
+    <section>
+      <label for="asset-search">Search assets</label>
+      <input id="asset-search" [value]="query()" (input)="query.set($any($event.target).value)" />
+      <ul>
+        @for (asset of filtered(); track asset.id) {
+          <li>
+            <button type="button" (click)="selected.emit(asset.id)">
+              {{ asset.name }} — {{ asset.status }}
+            </button>
+          </li>
+        } @empty {
+          <li>No matching assets</li>
+        }
+      </ul>
+    </section>
+  `,
+})
+export class AssetListComponent {
+  assets = input.required<Asset[]>();
+  selected = output<string>();
+  query = signal('');
+  filtered = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    return this.assets().filter((a) => a.name.toLowerCase().includes(q));
+  });
+}
+```
+
+**Trace:** browser input → Angular `(input)` handler → `query.set()` → `filtered` invalidates → template reads `filtered()` → Angular updates affected bindings/DOM. Stable `track asset.id` preserves list identity. At the parent, bind `[assets]="assets()"` and `(selected)="openAsset($event)"`.
+
+**Interview narration:** “React hooks taught me state ownership, derived selectors, and keyed reconciliation. Angular has corresponding patterns, but its templates, signals, and DI shape the implementation. I would keep domain interfaces, API contracts, and behavioral tests framework-neutral.”
+
+---
+
+# 3. Angular architecture: where things live
+
+```text
+Angular app
+├── app.config.ts / routes.ts         application providers + route config
+├── core/
+│   ├── auth/                          route guards, auth service, interceptors
+│   ├── api/                           typed API clients, DTO validation
+│   └── telemetry/                     tracing, RUM, error reporting
+├── design-system/
+│   ├── tokens/                        Sass/CSS semantic mapping
+│   ├── primitives/                    wrapped Material/CDK components
+│   └── patterns/                      tables, filter panels, status banners
+├── features/
+│   └── grid-assets/
+│       ├── asset-page.component.ts    orchestrates query/state/views
+│       ├── asset-store.service.ts     local domain data and operations
+│       ├── asset-table.component.ts   presentational table
+│       └── asset-detail.component.ts  detail + interactions
+└── styles.scss                        global Material theme + app defaults
+```
+
+**Boundary rule:** Page orchestrates; domain service owns fetch/operations; reusable components accept data and emit events; tokens express visual semantics; low-level Material/CDK owns interaction mechanics. Do **not** put networking inside every individual cell component.
+
+### Dependency injection — why staff engineers should care
+
+```ts
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+@Injectable({ providedIn: 'root' })
+export class AssetApi {
+  private http = inject(HttpClient);
+  list() {
+    return this.http.get<Asset[]>('/api/assets');
+  }
+}
+```
+
+Angular services can be scoped at root, route, or component levels. Root is shared across app; component-level providers may create isolated instances. Mis-scoping can create duplicate requests, inconsistent caches, or surprising state resets. Compare to React Context provider placement or a globally instantiated store.
+
+---
+
+# 4. Signals, RxJS, and change detection — deep dive
+
+## Pick the right abstraction
+
+| Need                                        | Preferred tool                                         | Avoid                                             |
+| ------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------- |
+| local UI state (`selectedId`, `isOpen`)     | `signal`                                               | global store for transient state                  |
+| derived view data                           | `computed`                                             | manual duplication + effect synchronization       |
+| parent contract                             | `input`, `output`, maybe `model`                       | implicit service coupling for reusable primitives |
+| simple HTTP GET tied to reactive parameters | `httpResource` **only if supported by target version** | treating every request as mutation                |
+| mutation with side effects                  | `HttpClient.post/put`, explicit loading/error state    | untracked fire-and-forget actions                 |
+| debounced keystroke stream                  | RxJS operators (`debounceTime`, `switchMap`)           | races between overlapping responses               |
+| WebSocket/telemetry stream                  | Observable → view model/signal                         | full redraw on every event                        |
+| cross-feature domain state                  | scoped service/store                                   | a giant mutable global singleton                  |
+
+## Signals basics
+
+```ts
+const selectedId = signal<string | null>(null);
+const assets = signal<Asset[]>([]);
+const selectedAsset = computed(() => assets().find((a) => a.id === selectedId()) ?? null);
+selectedId.set('asset-17');
+assets.update((current) =>
+  current.map((a) => (a.id === 'asset-17' ? { ...a, status: 'offline' } : a))
+);
+```
+
+`computed()` is lazy/derived and tracks signals it reads. Prefer it to an `effect()` that writes another signal. Do not mutate existing arrays invisibly (e.g., `assets().push(...)`), because that does not call the signal setter. Use immutable array updates unless you've designed a different reactive collection abstraction.
+
+## Observable request cancellation: critical skill
+
+```ts
+import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+
+private searchTerms = new Subject<string>();
+results$ = this.searchTerms.pipe(
+  debounceTime(250),
+  distinctUntilChanged(),
+  switchMap(q => this.http.get<Asset[]>('/api/assets', { params: { q } }))
+);
+
+search(q: string) { this.searchTerms.next(q); }
+```
+
+`switchMap` unsubscribes from the prior HTTP request when a newer search arrives, preventing stale previous results from taking over this stream. For explicit subscriptions in services/components, handle teardown (`takeUntilDestroyed` or an appropriate owner). Note: the above stream is cold to consumers; subscribe once with template `async` pipe or explicitly connect it to a state owner. Introduce errors and retry policy deliberately so the stream does not permanently terminate after one failed request.
+
+## Change detection vs React reconciliation
+
+- **React:** state update schedules component rendering; React calculates/render-commits changes; optimization tools include memoization and list/windowing. Rendering a component is not the same as replacing its whole DOM.
+- **Angular:** change detection evaluates template bindings and updates affected DOM; signals track dependencies; component checking strategy influences work. `OnPush` reduces unnecessary checks in appropriate component trees; its exact defaults and APIs depend on Angular version.
+- **Zone-based legacy Angular:** Zone.js historically helped schedule change detection from async tasks. Modern Angular supports zoneless patterns. Be able to discuss both without assuming every existing product is zoneless.
+- **Important:** A signal does not magically make rendering 10,000 chart DOM nodes cheap. Layout, paint, SVG paths, chart library updates, data transforms, network, and memory can dominate both frameworks.
+
+### Performance diagnosis answer
+
+1. Measure INP, LCP, long tasks, memory, network and actual user traces.
+2. Separate **data bottleneck** (fetch/transform), **framework bottleneck** (excess binding/component work), and **browser bottleneck** (DOM/layout/paint).
+3. Profile frequent updates, cap chart redraws, memoize/compute selectors appropriately, batch streaming data, render only visible rows, use stable row identity.
+4. Instrument before/after on realistic datasets (100, 1k, 10k visible candidates), slow devices, 7/30/90-day queries.
+5. Gate rollout and enforce budgets; don't assert Angular or React intrinsically wins without representative benchmarks.
+
+---
+
+# 5. Material Design, Angular Material, and design tokens (THE interview distinction)
+
+```text
+Brand + product design principles
+  ↓
+Primitive tokens (raw): color.blue.600, spacing.2, typography.size.14
+  ↓
+Semantic tokens (intent): color.surface, color.text.primary, status.critical
+  ↓
+Component tokens (specific): button.bg.primary, table.row.height, dialog.radius
+  ↓
+Angular Material / custom Angular components / React components
+  ↓
+Rendered DOM + accessible behavior
+```
+
+## Three separate things
+
+1. **Material Design (M3)** = a design language: principles, patterns, states, color roles, typography, elevation and interaction guidance.
+2. **Angular Material** = a component library implementing Material Design for Angular, e.g. `mat-button`, `mat-form-field`, `mat-dialog`, `mat-table`; relies on CDK infrastructure for many interactions.
+3. **Design tokens** = named variables representing design choices. A token system can drive **both Angular Material and React** through compiled CSS custom properties / platform-specific adapters. Tokens do not implement dialogs, routing, keyboard events, virtual scrolling, or data fetching.
+
+## Token hierarchy and brand ownership
+
+| Layer            | Example                                                         | Purpose                          | Owner                  |
+| ---------------- | --------------------------------------------------------------- | -------------------------------- | ---------------------- |
+| primitive        | `--brand-blue-600: #2458cf`                                     | raw palette value                | brand/design system    |
+| semantic         | `--app-action-primary: var(--brand-blue-600)`                   | meaning independent of component | design system          |
+| component        | `--app-button-bg: var(--app-action-primary)`                    | button variation                 | component system       |
+| Material adapter | map app semantic tokens into supported Material theme overrides | adapt vendor to product design   | Angular platform layer |
+| React adapter    | `.ui-button \{ background: var(--app-button-bg) \}`               | same intent in React             | React platform layer   |
+
+**Versioning rule:** Product semantic tokens are your stable public API. Material internal CSS/DOM selectors are **not** your public API. Use official `mat.theme`, `mat.theme-overrides`, and component-specific `mat.*-overrides` APIs as supported by the installed version. Avoid deep selectors / `::ng-deep` except as a temporary, documented exception.
+
+## Modern Angular Material theme (version-sensitive; validate against installed release)
+
+```scss
+/* styles.scss — modern Material 3 style */
+@use '@angular/material' as mat;
+
+html {
+  color-scheme: light dark;
+  @include mat.theme(
+    (
+      color: mat.$violet-palette,
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+/* Product-level semantic aliases available in both Angular and React */
+:root {
+  --app-status-ok: #177245;
+  --app-status-critical: #b3261e;
+  --app-space-sm: 8px;
+  --app-space-md: 16px;
+}
+
+/* Component token override via the supported mixin API */
+.asset-dashboard-compact {
+  @include mat.table-overrides(
+    (
+      row-item-container-height: 40px,
+    )
+  );
+}
+```
+
+`mat.table-overrides` token names and support must be checked against the installed version. For an example of a documented override, Angular Material's source guide shows `mat.card-overrides` with card surface/shape/title tokens. Do not assume an older app using `mat.define-theme(...)` can paste a modern `mat.theme(...)` snippet unchanged.
+
+### Theme switches and density
+
+**Theme:** scope semantic CSS variables using a root attribute (e.g. `[data-theme='dark']`) or `color-scheme`. Angular Material can integrate with the browser's light/dark behavior through the generated `light-dark()` based token values; test overlays/dialogs rendered outside local feature containers, not only the main page.
+
+**Density:** adjust structured controls as a coherent scale (table row heights, input padding, touch targets) and allow an opt-in compact mode for expert workflows. Do not shrink focus indicators or interactive targets below acceptable accessibility expectations solely to pack more grid data.
+
+**State & meaning:** a “critical feeder” needs text/icon/shape as well as red color; data visualization palettes must remain distinguishable under color vision differences and in high contrast.
+
+### Angular Material vs React MUI vs custom design system
+
+| Factor              | Angular Material                   | React + MUI                        | Custom headless primitives + tokens                  |
+| ------------------- | ---------------------------------- | ---------------------------------- | ---------------------------------------------------- |
+| Ecosystem           | native Angular integration         | native React integration           | potentially cross-framework design language          |
+| Opinionated visuals | strongly Material-based by default | strongly Material-based by default | completely product-specific                          |
+| A11y/overlays       | library/CDK foundation             | library-specific                   | implementation responsibility                        |
+| Token adaptation    | Material Sass/mixins/CSS vars      | MUI theme/CSS vars and adapters    | CSS variables/custom primitives                      |
+| Migration speed     | fast for Angular code              | fast for React code                | slower; better branding control                      |
+| Cost                | theme adapter, version dependency  | theme adapter, version dependency  | own API maintenance, accessibility, regression tests |
+
+**Staff tradeoff:** For grid-operations tooling, keep Angular Material where it gives reliable accessible controls quickly; create domain-specific visualizations and cross-framework semantic tokens where differentiated workflows require them. Avoid a massive component-library rewrite without measured benefit.
+
+---
+
+# 6. Concrete exercise: an electrical-grid operations dashboard
+
+**Product:** grid assets dashboard with status, loading, timeline, selectable rows, filters and alert details.
+
+## Requirements
+
+**Functional:** search assets; filter by criticality/region; sort and paginate results; open details panel; show timestamp freshness; choose 7/30/90-day metric range; light/dark and compact modes; support keyboard and screen readers.
+
+**Non-functional:** responsive, a11y, no stale search results, no 10k-row DOM, debounced search, avoid loading chart data for rows outside viewport, background data updates do not reorder list while the user is interacting; meaningful latency/INP budgets defined with product requirements.
+
+## Component/data flow
+
+```text
+GridAssetsPage
+  ├── FilterBar (MatFormField, MatSelect, query signal, input/output)
+  ├── AssetTable (MatTable or CDK virtual scroll, stable IDs)
+  │    └── StatusChip (semantic token colors + text)
+  ├── AssetDetailPanel (MatSidenav or Dialog, accessible focus)
+  │    └── MetricsChart (canvas/WebGL/SVG chosen by mark density)
+  ├── Error/Empty/Loading states
+  └── ThemeDensitySwitcher
+         ↓
+AssetQueryStore / Facade (signals + derived state)
+         ↓
+AssetApi / HttpClient (typed API + abort/cancel)
+         ↓
+GET /api/assets?region=&q=&sort=&cursor=
+GET /api/assets/{id}/metrics?from=&to=&resolution=
+```
+
+## Data model / API contracts
+
+```ts
+type AssetStatus = 'normal' | 'warning' | 'critical' | 'unknown';
+interface GridAsset {
+  id: string;
+  name: string;
+  regionId: string;
+  status: AssetStatus;
+  updatedAt: string;
+  version: number;
+}
+interface AssetPage {
+  items: GridAsset[];
+  nextCursor?: string;
+  snapshotAt: string; // make freshness explicit
+}
+interface MetricPoint {
+  ts: number;
+  value: number | null;
+  quality?: 'good' | 'estimated' | 'missing';
+}
+interface MetricsResponse {
+  assetId: string;
+  unit: string;
+  resolutionSeconds: number;
+  points: MetricPoint[];
+  sampled: boolean;
+}
+```
+
+**Deep dive:** 90-day trend queries should request aggregated resolutions (e.g. buckets) rather than transferring millions of raw points; reveal high-resolution only on zoom. Show missing/estimated data honestly rather than connecting impossible lines. Keep asynchronous work cancellable on filter changes. Use cursor-based pagination if underlying asset ordering can change frequently; preserve selection by ID.
+
+## Angular Material markup sketch
+
+```ts
+import { Component, signal } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatTableModule } from '@angular/material/table';
+
+@Component({
+  selector: 'app-grid-dashboard',
+  standalone: true,
+  imports: [MatButtonModule, MatTableModule],
+  template: `
+    <h1>Grid assets</h1>
+    <button matButton="filled" type="button" (click)="compact.update(v => !v)">
+      {{ compact() ? 'Comfortable layout' : 'Compact layout' }}
+    </button>
+    <div [class.asset-dashboard-compact]="compact()">
+      <table mat-table [dataSource]="assets()" aria-label="Grid assets">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let asset">{{ asset.name }}</td>
+        </ng-container>
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let asset">{{ asset.status }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns"></tr>
+      </table>
+    </div>
+  `,
+})
+export class GridDashboardComponent {
+  compact = signal(false);
+  assets = signal<GridAsset[]>([]);
+  columns = ['name', 'status'];
+}
+```
+
+**Note:** Angular Material button syntax has changed across versions; use the syntax documented by the installed release (`mat-button`, `mat-raised-button`, or modern `matButton` configuration). This example illustrates structure rather than a guaranteed drop-in implementation for every supported version. For a 10k-item workload, this example **must** be extended with backend pagination or virtual scrolling; `MatTable` alone is not virtualization.
+
+## Rendering strategy by scale
+
+| Workload                         | Appropriate choice                                            | Why                             |
+| -------------------------------- | ------------------------------------------------------------- | ------------------------------- |
+| <100 rows                        | MatTable with local sorting/filtering                         | low complexity                  |
+| 100–1k rows                      | server pagination + MatTable                                  | stable UI, simple fetch control |
+| 10k+ rows                        | paginated/virtualized visible window; CDK or specialized grid | bounded DOM and render cost     |
+| dozens of chart series × 90 days | bucketed API + canvas/WebGL where needed                      | DOM/SVG mark count can dominate |
+| fast telemetry (~1s)             | coalesce updates; selected drilldown gets priority            | avoid repaint storms            |
+
+**Accessibility warning:** virtualization makes offscreen DOM absent; carefully handle screen-reader row counts, focus when recycled rows move, announcements for new data, sortable column semantics, and keyboard navigation. For complex spreadsheets/grids, distinguish table vs interactive `grid` roles and test real screen readers.
+
+---
+
+# 7. Angular ↔ React migration: staff engineer decision framework
+
+## First challenge the premise
+
+Why migrate? Recruitment familiarity is not sufficient. Quantify expected benefit in feature delivery velocity, maintainability, platform alignment, performance, dependency lifecycle, talent and support costs. Equally: what are the costs of lost Angular Material behaviors, React duplicate bundles, parallel codebases, and regressions?
+
+### Options / decision table
+
+| Option                            | When it wins                                                    | Risks                                                    | Recommendation                      |
+| --------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------- | ----------------------------------- |
+| **Keep Angular, modernize**       | mature Angular app, productive team, styling/perf pain is local | modernization across Angular versions                    | **default when no business driver** |
+| **Route-level React replacement** | bounded feature, independent route shell                        | auth/router/shared nav contracts                         | **preferred migration seam**        |
+| **Island/embedded React widgets** | isolated complex visualization                                  | lifecycle, portals, duplicated frameworks, accessibility | useful for few targeted widgets     |
+| **Micro-frontend architecture**   | multiple autonomous teams with independent deployment           | runtime integration/operational cost                     | only with strong org need           |
+| **Big-bang rewrite**              | usually not justified                                           | regressions, long feature freeze, uncertain ROI          | avoid                               |
+
+## Strangler migration architecture
+
+```text
+Shared app shell / auth / routing / telemetry / feature flags
+      ├── existing Angular routes → Angular Material + legacy feature code
+      └── migrated React routes → React components + React adapter
+                   │
+             shared domain contracts
+             typed API schemas
+             semantic design tokens (CSS vars)
+             analytics event contract
+             accessibility contract
+```
+
+### Five phases with exit gates
+
+**Phase 0 — Discovery and baseline (1–2 sprints):** inventory routes/components, dependencies, version constraints, accessibility, token leakage, test coverage. Record web vitals, route startup, bundle cost, regressions and team velocity.
+
+**Phase 1 — Shared platform contracts:** design semantic tokens; auth/session interfaces; URL/deep links; analytics names; error handling; API DTOs; role permissions. Freeze common behavior contract, not all UI changes.
+
+**Phase 2 — Pilot:** pick low-blast-radius feature with meaningful interactions. Implement at route boundary first. Feature flag cohorts, include QA, screen-reader testing and back-navigation; preserve user state where appropriate.
+
+**Phase 3 — Measure:** compare TTI/INP, memory, defect count, code review throughput, accessibility regressions, development time and bundle duplication. Roll back if expected benefit is not realized.
+
+**Phase 4 — Expand / simplify:** prioritize by cost-benefit, progressively remove old integrations, eliminate duplicate adapters, track ownership and retire dead code.
+
+### Migration deep-dive questions
+
+**Can Angular and React coexist?** Yes, at route boundaries or through an explicit mount/unmount adapter. Be careful with lifecycle cleanup, routing, DI boundaries, shared state, overlays, error containment and duplicated runtimes.
+
+**How do we migrate tokens?** Export shared semantic CSS vars from a versioned package; Angular Material theme adapter maps the token semantics into supported overrides; React adapter consumes the same semantic CSS vars. Use screenshot/interaction regression tests for all themes, densities, and high-contrast mode.
+
+**How do we prevent state divergence?** Treat the URL and domain API as shared integration contracts. Avoid exposing framework-specific global stores across Angular↔React boundaries; sync through explicit events/typed interfaces only where necessary.
+
+**What does rollback look like?** Independent route flag, compatible server contract, durable deep links and preserved auth; disable route experiment without migrating persisted customer data backward.
+
+**How do we avoid false benchmarks?** Compare equivalent behavior, actual data volume, same hardware/browser and network; include overlay/chart behavior, telemetry and accessibility, not just initial HTML load.
+
+---
+
+# 8. Security, accessibility, reliability, and testing checklist
+
+## Security
+
+- Angular escapes/sanitizes many template contexts by default; **do not** bypass sanitization casually (`bypassSecurityTrust...` is dangerous when used on untrusted data). Review rich HTML, SVG, downloads and URL schemes.
+- Authorization is server-side; client route guards hide or guide UI but do not secure protected endpoints.
+- Sensitive utility-grid operational data: scoped roles, least privilege, audit trail, data classification, remove secrets from frontend bundle, avoid telemetry PII/sensitive locations.
+- CORS/CSP, CSRF/XSRF depending on auth method; avoid tokens in URLs; redact errors and traces.
+- For third-party map/chart libraries, review licenses, data exfiltration, long-term maintainability, perf and a11y.
+
+## Accessibility
+
+- Native buttons/labels first; Angular Material/CDK helps but does **not** guarantee the full application is accessible.
+- Dialog: focus trap, initial focus, Escape behavior where safe, restore focus on close, screen-reader title/description.
+- Table: understandable headers, sorting state, announcements, keyboard, pagination.
+- Charts: accessible summaries, data table alternative, meaningful color/shape cues, reduced motion.
+- Support browser zoom 200%+, reflow, contrast, error messages, 44×44-ish touch targets as product constraint, screen-reader workflows.
+
+## Tests
+
+- Component test: query input updates derived list, emits selected ID, empty/error state.
+- Service test: HTTP success, 401/403, 500, retry/cancel/out-of-order responses.
+- Material harness test: open/close dialog, select/filter/options, accessible name where possible.
+- Contract test: JSON parsing and backwards compatibility.
+- E2E: deep link, alert drilldown, theme switch, keyboard-only, long list, route migration flag on/off.
+- Visual regression: themes, density, responsive widths, warning/critical states.
+
+---
+
+# 9. Six-day study schedule (15–19 focused hours)
+
+| Day            | Focus                                                | Hands-on exercise                                          | Verbal rehearsal                                    | Deliverable               |
+| -------------- | ---------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------- | ------------------------- |
+| **1 (2.5–3h)** | standalone components, templates, inputs/outputs     | port React searchable asset list to Angular                | explain React→Angular mental mapping                | working list              |
+| **2 (2.5–3h)** | signals, computed, services, HTTP, RxJS cancellation | API search + loading/error + debounce/switchMap            | trace keystroke to DOM update                       | cancellable data flow     |
+| **3 (2.5–3h)** | Angular Material + M3 theming + 3-layer tokens       | build MatTable, select, dialog; theme/density toggle       | explain Material vs token layers                    | themed dashboard shell    |
+| **4 (2.5–3h)** | performance and a11y                                 | 10k-row strategy / virtual window; focus + labels; profile | defend Angular vs React rendering tradeoffs         | perf/a11y decision log    |
+| **5 (3–3.5h)** | staff architecture + migration                       | draw route migration + adapter contracts + rollout         | 5-minute migration proposal + challenge assumptions | migration RFC summary     |
+| **6 (2–3h)**   | mock system design + review                          | 45-min whiteboard grid dashboard, 15-min critique          | answer 10 questions below without notes             | interview-ready narrative |
+
+### How to set up (verify Node/CLI compatibility with chosen Angular version)
+
+```bash
+npx @angular/cli@latest new grid-ops-demo --routing --style=scss
+cd grid-ops-demo
+ng add @angular/material
+ng serve
+```
+
+Build incrementally; choose a stable Angular major that matches your target team's stack **if known**. The `@latest` route is for learning modern Angular, not a recommendation to upgrade a production application automatically.
+
+### Daily 20-minute drill
+
+**5 min:** explain one mapping from React. **10 min:** implement one component/refactor. **5 min:** say the tradeoff out loud with observable success metrics and a rollback condition.
+
+---
+
+# 10. 60-minute staff frontend system design interview playbook
+
+| Time   | Segment                                   | What to say/do                                                   |
+| ------ | ----------------------------------------- | ---------------------------------------------------------------- |
+| 0–6m   | Functional and nonfunctional requirements | users, critical workflows, dataset size, latency, security, a11y |
+| 6–12m  | High-level architecture                   | page → component → facade/service → APIs, tokens/Material seam   |
+| 12–18m | Data model / API                          | entity/version/freshness, pagination, metrics resolution         |
+| 18–27m | Component data binding                    | signals vs RxJS, input/output, cancellation, state ownership     |
+| 27–37m | Rendering / performance                   | table vs virtual window, chart marks, density/theme, profiling   |
+| 37–46m | Deep dive                                 | a11y of virtualized grid, realtime updates, failure states       |
+| 46–54m | Tradeoffs / migration                     | maintain Angular or route-by-route React; rollout/rollback       |
+| 54–60m | Validation + questions                    | metrics, tests, risks, ownership and phased delivery             |
+
+**High-quality one-minute architecture answer:** “I'd keep Angular Material for accessible foundational controls, introduce product-owned semantic tokens across the UI, and isolate the high-density visualization layer. The page owns route/filter state and binds a service-backed data model to view components using signals; network flows that need cancellation or continuous streams use RxJS. I would avoid rendering all 10,000 assets at once, downsample long-range time series, and measure both interaction latency and screen-reader experience. If considering React, I would first prove business value through one route-level migration with shared token and API contracts, feature flags, and rollback.”
+
+---
+
+# 11. Mock interview Q&A — expected Staff-level depth
+
+### Q1. Is Angular Material a design system?
+
+**Answer:** It is a component implementation aligned with the Material Design system, with its own theming infrastructure. A product design system also defines brand, semantic tokens, chart/data visual conventions, UX patterns, accessibility policies, documentation and governance. Angular Material is a useful foundation, not the whole system.
+
+### Q2. If React is more familiar, why not rewrite Angular entirely?
+
+**Answer:** Migration is an economic and engineering decision, not a syntax preference. First measure developer pain and performance. Optimize in Angular when the issue is rendering/network/browser work; choose an incremental seam when platform alignment offers measurable benefit. Maintain rollback and functionality parity.
+
+### Q3. How do design tokens make migration easier?
+
+**Answer:** Separate semantic design language from framework implementation. Stable app-owned CSS variables feed Material adapter and React adapter. Components may remain completely different internally but visual intent, themes and accessibility expectations remain consistent.
+
+### Q4. Signals vs RxJS: when do you use each?
+
+**Answer:** Signals for local synchronous state and derived values, RxJS for asynchronous event streams, cancellation and composition. Bridge them at a service/facade boundary as needed, not with duplicated subscriptions in every view component.
+
+### Q5. Does OnPush guarantee high performance?
+
+**Answer:** No. It can reduce unnecessary checking, but large DOM, expensive computed work, chart rendering, layout, network, poor data shape or leaks can dominate. Benchmark realistic workloads and examine profiler evidence.
+
+### Q6. Why not use `MatTableDataSource` for everything?
+
+**Answer:** It's convenient for simpler client-side table use cases. Large or live datasets need explicit server pagination/filtering, cache, stream throttling or virtualization. Native table semantics and accessibility need consideration when virtualizing.
+
+### Q7. How do you customize a Material button's style safely?
+
+**Answer:** At the appropriate level: Material theme and supported component override APIs; map product semantic tokens through a stable adapter. Don't target private internal MDC selectors unless you accept brittle upgrade risk and have a time-bound exception.
+
+### Q8. How does a dark theme reach a dialog overlay?
+
+**Answer:** Many overlays render in a global overlay container instead of inside the initiating component subtree. Apply relevant theme CSS variables/scope to the overlay root or global root; test dialogs, menus, tooltips, and portals, not just ordinary descendant components.
+
+### Q9. How would you display 10k assets and 90 days of metrics?
+
+**Answer:** Separate asset summary list and time-series detail; cursor/page and virtualize rows; fetch aggregated temporal resolution, zoom for detail; coalesce live updates, prioritize active selection, cache by query key and enforce a memory budget. Validate in browser profiling and screen-reader testing.
+
+### Q10. How would you convince another team to adopt design tokens?
+
+**Answer:** Start with high-friction repeated inconsistencies; publish a small semantic token API, Figma-to-code naming spec, adapters, codemod guidance and lint/visual tests. Pilot one shared component, document ownership, deprecation strategy and backward compatibility. Track adoption and defect/iteration speed.
+
+### Q11. How does Angular DI differ from React Context?
+
+**Answer:** Angular hierarchical dependency injection creates and resolves service/provider instances at defined scopes; React Context primarily passes a value down a component subtree and is often combined with other state patterns. Angular DI service lifetime impacts caches and requests; React provider placement similarly impacts shared ownership.
+
+### Q12. What if legacy Angular code is full of NgModules and `*ngFor`?
+
+**Answer:** Don't block on a wholesale upgrade. Identify version constraints, critical routes and API boundaries; write new work according to the supported conventions; use staged migration tooling where justified; maintain mixed-mode compatibility tests and gradual modernization.
+
+---
+
+# 12. Last-day cheat sheet: memorize this
+
+```text
+Angular component = @Component + class + template + imports
+Bindings          = {{ value }} | [prop]="expr" | (event)="handler($event)"
+Two-way           = [(value)] / model() when warranted
+Loop              = @for (item of items(); track item.id) { ... }
+Conditional       = @if (loading()) { ... } @else { ... }
+State             = signal(initial); state(); state.set(x); state.update(fn)
+Derived           = computed(() => ...signals()...)
+Parent/child      = input(), output(); domain service via inject()
+Async             = HttpClient Observable; switchMap cancels stale search
+Material          = @angular/material UI primitives; @angular/cdk low-level behavior
+Theme             = Material M3 Sass theme -> CSS custom properties
+Tokens            = primitive -> semantic -> component -> framework adapters
+Performance       = measure -> isolate CPU/DOM/network -> bound DOM -> retest
+Migration         = business case -> shared contracts -> pilot route -> flags -> measure/rollback
+```
+
+## Final self-test: you are ready if you can...
+
+- [ ] Explain React props/state/effects vs Angular inputs/signals/services without mixing syntax.
+- [ ] Build standalone component with `@if`, `@for`, `input()`, `output()` and tracked lists.
+- [ ] Describe Angular change detection and RxJS cancellation, and distinguish old vs modern application styles.
+- [ ] Draw primitive→semantic→component tokens, plus Angular Material/React adapters.
+- [ ] Explain M3 `mat.theme` and supported overrides, and why private CSS selectors are fragile.
+- [ ] Outline MatTable, Dialog, CDK overlay and virtualization a11y concerns.
+- [ ] Give a 60-minute architecture answer for a grid asset dashboard with APIs, data binding and rendering.
+- [ ] Defend both “keep Angular” and “migrate gradually to React” with metrics, security, risk and rollback.
+
+---
+
+# 13. Official resources (read in this order)
+
+1. Angular essentials / signals: https://angular.dev/essentials/signals
+2. Angular control flow: https://angular.dev/guide/templates/control-flow
+3. Angular component inputs: https://angular.dev/guide/components/inputs
+4. Angular HTTP requests: https://angular.dev/guide/http/making-requests
+5. Angular HTTP reactive resource (version dependent): https://angular.dev/guide/http/http-resource
+6. Angular dependency injection/providers: https://angular.dev/guide/di/defining-dependency-providers
+7. Angular Material current theming source: https://github.com/angular/components/blob/main/guides/theming.md
+8. Angular Material v18 theming (legacy comparison): https://v18.material.angular.dev/guide/theming
+9. Angular Material component documentation: https://material.angular.dev/components/categories
+10. Angular Material CDK: https://material.angular.dev/cdk/categories
+
+**Reading strategy:** Spend a maximum of 20–30 minutes per official guide, immediately write an equivalent React↔Angular example, and rehearse one architectural tradeoff aloud. Avoid memorizing every directive or lifecycle hook.
