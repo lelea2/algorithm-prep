@@ -461,7 +461,7 @@ export class GridDashboardComponent {
 
 | Workload                         | Appropriate choice                                            | Why                             |
 | -------------------------------- | ------------------------------------------------------------- | ------------------------------- |
-| <100 rows                        | MatTable with local sorting/filtering                         | low complexity                  |
+| under 100 rows                   | MatTable with local sorting/filtering                         | low complexity                  |
 | 100–1k rows                      | server pagination + MatTable                                  | stable UI, simple fetch control |
 | 10k+ rows                        | paginated/virtualized visible window; CDK or specialized grid | bounded DOM and render cost     |
 | dozens of chart series × 90 days | bucketed API + canvas/WebGL where needed                      | DOM/SVG mark count can dominate |
