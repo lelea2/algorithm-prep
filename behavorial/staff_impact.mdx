@@ -1,0 +1,191 @@
+---
+title: 'Feature Statistics Platform'
+description: 'Interview narrative for the LinkedIn Feature Statistics Platform: cross-org ownership, the three architectural decisions, and the Staff-level signals to emphasize when delivering it.'
+---
+
+# Feature Statistics Platform — Staff Impact Story
+
+> Goal: present this as a Staff-level narrative that shows vision beyond the stated ask, technical ownership across a fragmented organization, and durable leverage left behind for other teams — not just a shipped dashboard.
+
+---
+
+## 1. Thirty-Second Version
+
+I led the Feature Statistics Platform at LinkedIn, which became a core part of our MLOps observability infrastructure. At the time, LinkedIn had hundreds of ML models in production with good visibility into infrastructure health and deployment status, but a real blind spot around model-quality degradation — when something went wrong, engineers had to manually correlate feature events, pipeline logs, and multiple dashboards just to find the root cause.
+
+I recognized this wasn't simply a monitoring gap — it was platform fragmentation. Rather than building another one-off dashboard, I drove a unified, scalable approach to model-health diagnosis that more than ten engineers and stakeholders across serving, data science, infrastructure, SRE, MLOps, and EngX could rely on. I owned the end-to-end technical direction: feature telemetry collection, statistical aggregation, and the frontend diagnostic experience, organized around explicit contracts between instrumentation, ingestion, aggregation, storage, querying, alerting, and visualization.
+
+The result was a shared technical foundation, not just a product — other teams could build on it rather than re-solving the same observability problem.
+
+---
+
+## 2. Two-Minute Interview Script
+
+### Situation
+
+LinkedIn had hundreds of ML models running in production. We had good visibility into infrastructure health, deployment status, and inference performance, but a significant blind spot around model-quality degradation. When something went wrong, engineers had to manually correlate feature events, pipeline logs, and multiple dashboards to identify root cause — there was no unified place to diagnose _why_ a model's behavior had changed.
+
+### Task
+
+I recognized this wasn't simply a monitoring problem — it was a platform fragmentation problem. Rather than building another dashboard, my goal was to establish a unified, scalable approach to model-health diagnosis that multiple teams across LinkedIn could rely on, not just my own team.
+
+### Action
+
+I took ownership of the end-to-end technical direction, from feature telemetry collection and statistical aggregation to the frontend diagnostic experience. The initiative involved more than ten engineers and stakeholders across model serving, data science, infrastructure, SRE, MLOps, and EngX — each with different, sometimes conflicting priorities: serving teams wanted minimal production overhead, data scientists prioritized statistical accuracy, SRE needed reliable alerts with few false positives, and frontend teams needed responsive visualization over large historical datasets.
+
+My role was to bring these groups together, establish common technical principles, and make architectural decisions that balanced these competing requirements. I organized the architecture around clear contracts between instrumentation, ingestion, aggregation, storage, querying, alerting, and visualization, so individual engineers could own components without the end-to-end design drifting apart.
+
+Three architectural decisions best illustrate the technical contribution (detailed in Section 4):
+
+1. Deterministic sampling at the serving agent plus streaming windowed aggregation, with explicit confidence states — so observability never became a reliability risk for serving.
+2. A viewport-driven resolution strategy on the frontend, backed by Web Workers and bounded SVG rendering, so investigating 100 features over 30 days didn't mean rendering 72,000 raw points at once.
+3. A reusable React visualization framework built with EngX, with an adapter-based adoption path, so other teams could gain these capabilities without rewriting their products.
+
+### Result
+
+We didn't just deliver a dashboard — we established a shared technical foundation. Model-quality incidents that used to require manually correlating feature events, pipeline logs, and multiple dashboards could now be diagnosed from one consistent surface. More importantly, the architecture and the reusable visualization framework became leverage other teams built on, rather than a single-purpose tool only my team could extend.
+
+---
+
+## 3. Ownership and Cross-Org Leadership
+
+The hardest part of this initiative wasn't the algorithms — it was that every organization involved wanted something different from the same system:
+
+| Org                      | Priority                                              | Tension with other orgs                                      |
+| ------------------------ | ----------------------------------------------------- | ------------------------------------------------------------ |
+| Model serving            | Minimal production overhead                           | Pulls against statistical completeness and alert sensitivity |
+| Data science             | Statistical accuracy                                  | Pulls against sampling/cost control                          |
+| SRE                      | Reliable alerts, few false positives                  | Pulls against raw sensitivity to small shifts                |
+| Frontend / investigation | Responsive visualization of large historical datasets | Pulls against shipping every raw data point                  |
+| EngX                     | Reusable, framework-level leverage                    | Pulls against shipping something product-specific and fast   |
+
+My role was not to pick a winner among these — it was to find the architectural decisions where the tension was resolvable by design rather than by compromise. The sampling-plus-confidence-state approach (Section 4.1) is the clearest example: it didn't split the difference between "collect everything" and "collect less" — it changed what "reliable" meant so serving teams got low overhead _and_ data scientists got an honest signal about when data was statistically insufficient, instead of silently-wrong data presented as trustworthy.
+
+I organized the system around clear contracts between instrumentation, ingestion, aggregation, storage, querying, alerting, and visualization. That let each organization own and iterate on their component independently — serving owned instrumentation, data science owned aggregation semantics, SRE owned alerting thresholds, frontend owned the investigation experience — while the contracts kept the end-to-end design consistent instead of each team building their own private interpretation of "model health."
+
+---
+
+## 4. Technical Strategy — Three Critical Decisions
+
+### 4.1 Observability without becoming a reliability risk
+
+Rather than collecting every feature event and processing everything downstream, I drove the decision to use **deterministic sampling at the serving agent**, followed by **streaming windowed aggregation**. We preserved sampling metadata and introduced **explicit confidence states**, so we could control ingestion cost without presenting statistically insufficient data as if it were reliable.
+
+> The principle: observability should never become a reliability risk for model serving.
+
+This is the decision to lead with in an interview — it shows you resolved a real three-way tension (serving overhead vs. statistical accuracy vs. alert trustworthiness) with one design choice, rather than negotiating a watered-down compromise between teams.
+
+### 4.2 Frontend scalability and the investigation workflow
+
+Visualizing 100 features across 30 days at hourly resolution produces 72,000 data points — far too many to load and render naively. Instead of loading the entire dataset, I established a **viewport-driven resolution strategy**: the backend returned aggregated statistics scoped to the visible time range, and the frontend requested higher-resolution data only when a user zoomed into a specific feature or time window. Combined with **Web Workers** for off-main-thread processing and **bounded SVG rendering**, the investigation experience stayed responsive regardless of how much historical data existed underneath it.
+
+This mirrors a general staff-level pattern worth naming explicitly in the room: _render only what the viewport can show, and let user intent (zoom, focus) drive fetching more resolution_ — the same principle behind virtualization and progressive loading elsewhere in frontend system design.
+
+### 4.3 Organizational leverage over a one-off product
+
+Rather than building another product-specific implementation, I partnered with **EngX** to develop a reusable **React visualization framework** with shared interaction patterns, accessibility standards, and extension points. We designed an **adapter-based adoption strategy** so other teams could integrate these visualization and diagnostic capabilities without rewriting their existing products.
+
+This is the decision that turns the story from "I shipped a good tool" into "I created a platform other teams could build on" — the clearest Staff-level signal of the three.
+
+---
+
+## 5. Impact Framing
+
+| Area                        | Before                                                                                     | After                                                                                                        | Impact                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Root-cause diagnosis        | Manual correlation across feature events, pipeline logs, and multiple dashboards           | Unified diagnostic surface across feature telemetry, aggregation, and alerting                               | Faster incident investigation                                             |
+| Ingestion cost vs. accuracy | Implicit tradeoff, no visibility into data sufficiency                                     | Deterministic sampling with explicit confidence states                                                       | Lower serving overhead without silently unreliable signals                |
+| Investigation UX at scale   | Naively rendering full historical ranges (100 features × 30 days × hourly ≈ 72,000 points) | Viewport-driven resolution + Web Workers + bounded SVG rendering                                             | Responsive investigation regardless of underlying data volume             |
+| Organizational reach        | Fragmented, team-specific monitoring approaches                                            | Shared contracts (instrumentation → ingestion → aggregation → storage → querying → alerting → visualization) | Teams own components independently without the end-to-end design drifting |
+| Reusability                 | Product-specific implementation                                                            | Reusable React visualization framework via EngX, adapter-based adoption                                      | Other teams integrate without rewriting their products                    |
+| Model coverage              | No unified health signal across the fleet                                                  | Supported more than 600 active classification models across over 10 organizations                            | Platform operates at org-wide scale, not team scale                       |
+| Incident response           | Manual, multi-dashboard correlation                                                        | ~90% improvement in mean time to detection and recovery; ~70% reduction in incident-severity impact           | Faster, less severe incidents org-wide                                    |
+| Adoption                    | No shared diagnostic surface                                                               | 200+ unique visits per day; capabilities referenced by 20+ products                                           | Durable usage and reuse, not a one-off tool                               |
+
+---
+
+## 6. Three Sentences to Emphasize During Delivery
+
+These are the strongest Staff-level signals in the story. Slow down slightly when delivering them.
+
+**Vision:** "I recognized that this wasn't simply a monitoring problem. It was a platform fragmentation problem."
+
+**Technical leadership:** "My role was to establish common technical principles and make architectural decisions that balanced competing requirements across organizations."
+
+**Organizational impact:** "We didn't just deliver a dashboard. We established a shared technical foundation that enabled other teams to build and innovate faster."
+
+---
+
+## 7. Scenario Questions and Strong Answers
+
+### "Why sampling instead of collecting everything?"
+
+Collecting every feature event and processing it all downstream doesn't scale with hundreds of production models, and it puts observability cost directly in the critical path of serving. Deterministic sampling plus streaming windowed aggregation controls that cost — but the part that matters is preserving sampling metadata and exposing explicit confidence states, so a sparse sample is never presented with the same authority as a complete one. That's the difference between "cheaper" and "cheaper and still honest."
+
+### "How did you decide what data science, SRE, and serving teams each needed without just picking a side?"
+
+I looked for architectural decisions where the tension was resolvable by design, not by negotiation. The confidence-state approach is the clearest example: serving teams got lower overhead, and data scientists/SRE got an explicit signal for when a statistic shouldn't be trusted yet, instead of a single "correct" sampling rate that would have under-served one side or the other.
+
+### "How did you keep the frontend responsive with that much historical data?"
+
+The mistake would be rendering everything the backend has and hoping the browser keeps up. Instead, the backend returned aggregated statistics scoped to the visible viewport, and the frontend only requested finer resolution when the user actually zoomed into a feature or time window. Web Workers kept that processing off the main thread, and SVG rendering stayed bounded to what was actually visible — so cost scaled with what the user was looking at, not with total historical volume.
+
+### "Why involve EngX instead of just shipping the visualization yourself?"
+
+Because the fastest path to "a good tool for my team" and the right path to "leverage for the org" are different projects. Building it as a reusable React framework with shared interaction patterns, accessibility standards, and an adapter-based adoption model meant other teams could integrate these diagnostic capabilities without rewriting their own products. That's the difference between solving the problem once and solving it for every team that hits it next.
+
+### "What was the hardest part of this, technically or organizationally?"
+
+Organizationally: more than ten engineers and stakeholders across six different orgs, each optimizing for a different thing — overhead, accuracy, alert quality, UX responsiveness. The technical architecture had to absorb that tension, which is why the contracts between instrumentation, ingestion, aggregation, storage, querying, alerting, and visualization mattered as much as any single algorithmic choice — they let each org own their piece without the whole system becoming incoherent.
+
+### "What would you have done differently, or what's the next step?"
+
+I would have established the cross-team data contracts and success metrics earlier in the project. We started by focusing heavily on the immediate technical challenges — collecting telemetry efficiently, building a scalable aggregation pipeline, delivering a responsive visualization experience — and those decisions worked well, but I later realized different stakeholders had different definitions of success: data scientists cared about statistical confidence, SRE cared about actionable alerts, frontend engineers and end users cared about rendering performance. Bringing those teams together earlier to agree on shared architectural principles, measurable success criteria, and end-to-end data contracts — upfront, not after the fact — would have let us validate not just whether the system was technically performant, but whether it was actually improving the model owner's diagnostic workflow. (See Section 9 for the full version of this answer.)
+
+### "What makes this a Staff-level story rather than a Senior-level one?"
+
+A Senior engineer solves the stated problem well. This story is Staff-level because the problem as stated — "we need better monitoring" — was reframed into the actual problem — "our observability approach is fragmented across orgs" — and the solution was built to be reusable infrastructure for other teams, not a single polished product. The three architectural decisions each resolve a cross-team tension by design rather than by compromise, and the EngX partnership converts the work into durable organizational leverage instead of a one-off deliverable.
+
+---
+
+## 8. What I'm Most Proud Of
+
+### Connect decisions to outcomes
+
+The platform ultimately supported more than 600 active classification models across over 10 organizations.
+
+We reported approximately a 90% improvement in mean time to detection and recovery, along with a 70% reduction in incident-severity impact.
+
+The experience also reached more than 200 unique visits per day, and the platform capabilities were referenced by over 20 products.
+
+But beyond those metrics, the most important outcome was the organizational impact. We moved from fragmented monitoring implementations to shared technical contracts, consistent diagnostic workflows, and reusable visualization capabilities. That meant other teams could build on the platform rather than repeatedly solving the same infrastructure and frontend problems.
+
+### Reflection — demonstrate Staff-level thinking
+
+Looking back, the most challenging part wasn't any individual technology. It was making the right tradeoffs across multiple systems while aligning teams with different priorities. I had to balance statistical accuracy against serving reliability, historical data fidelity against browser performance, and immediate product delivery against long-term platform reuse.
+
+What this experience reinforced for me is that Staff engineering is about more than solving complex technical problems yourself. It's about setting a technical direction, creating alignment, and enabling multiple teams to execute effectively.
+
+And that's what I'm most proud of with this project. We didn't just deliver a feature statistics dashboard. We established a shared foundation for model-health observability that could scale across the organization.
+
+I'd be happy to go deeper into any of those architectural decisions, particularly the sampling pipeline, frontend scalability, or how I drove cross-team alignment.
+
+---
+
+## 9. What I Would Do Differently
+
+Looking back, one thing I would do differently is establish the cross-team data contracts and success metrics earlier in the project.
+
+When we started Feature Statistics, we focused heavily on solving the immediate technical challenges: collecting telemetry efficiently, building a scalable aggregation pipeline, and delivering a responsive visualization experience. While those decisions worked well, I realized that different stakeholders had different definitions of success. Data scientists cared about statistical confidence, SRE cared about actionable alerts, and frontend engineers and end users cared about rendering performance.
+
+If I were to redo the project, I would bring these teams together earlier to define a shared set of architectural principles, measurable success criteria, and end-to-end data contracts. For example, I would establish upfront how sampling affects statistical confidence, how aggregation resolution affects detection accuracy, and how the frontend should communicate insufficient or stale data.
+
+I would also introduce product-level metrics earlier, such as how quickly an engineer can move from receiving an alert to identifying the specific feature responsible for degradation. That would allow us to validate not just whether the system was technically performant, but whether we were actually improving the model owner's diagnostic workflow.
+
+The biggest lesson for me is that Staff-level impact isn't just about making good architectural decisions. It's about establishing the right decision-making framework early enough that multiple teams can independently make consistent decisions. That's something I've carried forward in how I approach platform architecture and cross-functional technical leadership.
+
+---
+
+## 10. Closing Statement
+
+"I didn't start from 'let's build a better dashboard.' I started from the fact that engineers across multiple orgs were manually stitching together feature events, logs, and dashboards to diagnose the same class of problem, over and over. That told me the gap was architectural, not cosmetic. The decisions I'm proudest of — deterministic sampling with honest confidence states, viewport-driven rendering at scale, and partnering with EngX to make the visualization layer reusable — all share one property: they didn't trade one team's needs for another's, they changed the design so multiple teams' needs could be met at once. That's the difference between shipping a product and building a foundation other teams can stand on."

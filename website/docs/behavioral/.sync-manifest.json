@@ -8,22 +8,6 @@
       "hash": "3d57d2ce832f2b9dc5a5aec6c55b803d0b57a059738c3adf8ceb91d8cb4672dc",
       "docRelative": "rehearsal_map.png"
     },
-    "behavorial/ai-enabled-playbook.mdx": {
-      "hash": "a2c4de61974f1181c7ab5f30fd1567389b16a85269e8bbd8c37bd1f37baa97c8",
-      "docRelative": "ai-enabled-playbook.mdx"
-    },
-    "behavorial/ai-prompt-template.mdx": {
-      "hash": "12826a937182a77e986033b91858f246cb6502a69fec8eca1a9f95ff2a52a5ed",
-      "docRelative": "ai-prompt-template.mdx"
-    },
-    "behavorial/ai_coding_experience_interview_script.mdx": {
-      "hash": "9c90b8779c52f1328d379dd95ccf4b7918d6d909efa4f29b55b56135820753b9",
-      "docRelative": "ai_coding_experience_interview_script.mdx"
-    },
-    "behavorial/ai_observability_study.mdx": {
-      "hash": "ba48d0edfe2801ba513d637d3c06a7f6d24c03145715245ab27cc45a2d6298db",
-      "docRelative": "ai_observability_study.mdx"
-    },
     "behavorial/db-selection.mdx": {
       "hash": "f6b035879a018b6461a23582d4333d20854ad324aa0df54c8b99dbf24511c701",
       "docRelative": "db-selection.mdx"
@@ -95,6 +79,10 @@
     "behavorial/staff_frontend_web_experience_interview.mdx": {
       "hash": "f57af264f4d222028f922bd1d4522dd2285e16fdb07c4f907d819992b4b8f682",
       "docRelative": "staff_frontend_web_experience_interview.mdx"
+    },
+    "behavorial/staff_impact.mdx": {
+      "hash": "e88d689046e6951f5d0f34370eab1491c5bab337b6ee78fd850c7317a93702c0",
+      "docRelative": "staff_impact.mdx"
     },
     "behavorial/stencil-design-system-interview-story.mdx": {
       "hash": "61523b2156325aaf65d1a2486f88139f3a3e6d4b04ecd9846edacfb22ae75587",
