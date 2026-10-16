@@ -56,6 +56,10 @@
       "hash": "fcc534b25f56c4c4d39ace50f9b225192516499bd25ef68bf5dce9a54689b728",
       "docRelative": "frontend/interview/SpreadSheetHistory.mdx"
     },
+    "frontend/interview/TextHighLight.js": {
+      "hash": "d1940bb57091b647e780e38a0d9199f36c0f0ba6cd76e4e8c28b552be5549ac0",
+      "docRelative": "frontend/interview/TextHighLight.mdx"
+    },
     "frontend/interview/TrieNode.js": {
       "hash": "747dcdaaf21a9ae61c3fc578a011ed7318ff011426e81a7c3c7e9300e9449908",
       "docRelative": "frontend/interview/TrieNode.mdx"
@@ -187,6 +191,10 @@
     "frontend/interview/spreadsheet.js": {
       "hash": "b3e9c218898773caa745a982605d38ca2979359ec01464c7bc1f87a85aae0eed",
       "docRelative": "frontend/interview/spreadsheet.mdx"
+    },
+    "frontend/interview/streaming-interview.js": {
+      "hash": "bc6f3806b2b182a7c34838477ad671bf90eadd1e52003b5a4c38b39b3aca5583",
+      "docRelative": "frontend/interview/streaming-interview.mdx"
     },
     "frontend/interview/topilogicalSortGeneric.js": {
       "hash": "759123c278e45eaf980ac371fdf70f7d56bf42eb124c61174d52c8173f253b96",
@@ -2417,7 +2425,7 @@
       "docRelative": "frontend/css/_index.mdx"
     },
     "__nav__:frontend/interview": {
-      "hash": "2b7bfe4bdd7b62f24bc0e520f01ecd3989af8248f9c949e1c7c8b712217f533e",
+      "hash": "6c82f5b24eeb4883a3dc61aae2b64ca14103fbcefc4e5d299a32611d6c626535",
       "docRelative": "frontend/interview/_index.mdx"
     },
     "__nav__:frontend/jsfunction": {
