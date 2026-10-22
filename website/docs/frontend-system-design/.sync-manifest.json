@@ -72,6 +72,14 @@
       "hash": "4e42bf5c1521e48852ad87403371a5f12f146aa9b45d7dc59aa9c18834392672",
       "docRelative": "google-docs.png"
     },
+    "frontend-system-design/grid-system-design-angular.png": {
+      "hash": "44ecfcbf52356c731beb5f68a262cc714120e99f6f0fac147b7faa4bd2b73aa4",
+      "docRelative": "grid-system-design-angular.png"
+    },
+    "frontend-system-design/grid-system-design.png": {
+      "hash": "27c753392000c9d65498e66d5c311fc0f88a53df56d7000492ae5ab470929c4d",
+      "docRelative": "grid-system-design.png"
+    },
     "frontend-system-design/newsfeed.png": {
       "hash": "d00a826531da42cc486c9109de543756f9649cf67ec6ca7f17045508b02b4839",
       "docRelative": "newsfeed.png"
@@ -255,6 +263,10 @@
     "frontend-system-design/google-docs-design.mdx": {
       "hash": "1bb840fc2dab8564d65f68eb1e5cda96e2b90d5cd7f490e6adae1a0fbee83f73",
       "docRelative": "google-docs-design.mdx"
+    },
+    "frontend-system-design/grid-system-design.mdx": {
+      "hash": "f3bf9f302d2f097ec23a9d14f2d2994dc0e6933d606e64bb94c329067895ed28",
+      "docRelative": "grid-system-design.mdx"
     },
     "frontend-system-design/news-feed.mdx": {
       "hash": "f22e331adefabfd573c3ee9bb79fcae63f740be5ab5fb7aa9807d599bfdc9873",
